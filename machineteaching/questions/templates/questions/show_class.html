@@ -6,51 +6,33 @@
 <div class="col col-6">
     <div class="card">
         <h3>{% blocktrans %}Chapters{% endblocktrans %}</h3>
-        <table>
-            <tr>
-                <td style="padding-left: 1rem; font-weight: 400; width: 50%">{% blocktrans %}Chapter{% endblocktrans %}</td>
-                <td style="font-weight: 400; text-align: center;">{% blocktrans %}Deadline{% endblocktrans %}</td>
-            </tr>
-            {% for chapter in chapters %}
-            <tr class="row" style="cursor: pointer;" onclick="window.location='{% url 'show_chapter' chapter=chapter.chapter.id %}';">
-                <td>{{chapter.chapter.label}}</td>
-                <td style="text-align: center;">{{chapter.deadline.deadline}}</td>
-                <td style="text-align: right;"><a href="{% url 'delete_deadline' onlineclass=onlineclass.id deadline=chapter.deadline.id %}" class="link del">{% blocktrans %}Delete{% endblocktrans %}</a></td>
-            </tr>
-            {% endfor %}
+        </table>
+    </div>
+
+    <div class="card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h3>{% blocktrans %}Exams{% endblocktrans %}</h3>
+            <a href="{% url 'create_evaluation' onlineclass_id=onlineclass.id %}" class="btn btn-sm btn-primary">{% blocktrans %}Add Exam{% endblocktrans %}</a>
+        </div>
+        <table class="table table-hover">
+            <tbody>
+                {% for evaluation in evaluations %}
+                <tr style="cursor: pointer;" onclick="window.location='{% url 'manage_evaluation' evaluation_id=evaluation.id %}';">
+                    <td>{{ evaluation.title }}</td>
+                    <td class="text-end">
+                        <span class="badge bg-{{ evaluation.status_color }}">{{ evaluation.status }}</span>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="2" class="text-muted">{% blocktrans %}No exams have been created for this class yet.{% endblocktrans %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
         </table>
     </div>
     <div class="card">
         <h3>{% blocktrans %}Add chapter{% endblocktrans %}</h3>
-        <form action="{% url 'manage_class' onlineclass=onlineclass.id %}" method="POST">
-            {% csrf_token %}
-                {% for message in form.chapter.errors %}
-                <span id="error">{{ message }}</span></br>
-                {% endfor %}
-                <h4>{% blocktrans %}Name{% endblocktrans %}</h4>
-                <select name="{{ form.chapter.name }}" id="id_chapter" required="required" style="width: 100%; margin-bottom: 1rem;">
-                    {% for item in form.chapter.field.choices %}
-                    <option value="{{ item.0 }}" {% if item.0 == chapter %}selected{% endif %}>{{ item.1 }}</option>
-                    {% endfor %}
-                </select>
-                <div style="display: flex; text-align: flex-start; flex-direction: column;">
-                <h4>{% blocktrans %}Deadline{% endblocktrans %}</h4>
-                <div style='display: flex; flex-direction: row; align-items: center;'>
-                <div style="width: 50%">
-                {% for message in form.date.errors %}
-                <span id="error" style="text-align: center;">{{ message }}</span></br>
-                {% endfor %}
-                <input type="date" name="date" placeholder="{% blocktrans %}Date (yyyy-mm-dd){% endblocktrans %}" required style="width: calc(100%);">
-                </div>
-                <div style="width: 50%">
-                {% for message in form.time.errors %}
-                <span id="error" style="margin-left: 1rem; text-align: center;">{{ message }}</span></br>
-                {% endfor %}
-                <input type="text" name="time" placeholder="{% blocktrans %}Time (H:M){% endblocktrans %}" required style="width: calc(100% - 1rem); margin-left: 1rem">
-                 </div></div></div>
-            <div class="col-12" style="margin-top: 1rem; text-align: center;">
-                <button class="primary" type="submit">{% blocktrans %}Add{% endblocktrans %}</button>
-            </div>
         </form>
     </div>
 </div>

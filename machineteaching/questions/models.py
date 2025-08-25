@@ -11,7 +11,7 @@ import json
 from random import randint, SystemRandom
 import numpy as np
 from simple_history.models import HistoricalRecords
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from questions.decorators import disable_for_loaddata
 
 # Create your models here.
@@ -61,6 +61,8 @@ class Problem(models.Model):
     chapter = models.ManyToManyField(Chapter, through='ExerciseSet')
     test_case_generator = models.TextField(blank=True, null=True)
     history = HistoricalRecords()
+    evaluation_problem = models.BooleanField(default=False)
+    locked_problem = models.BooleanField(default=False)
 
     def __unicode__(self):
         return self.title
@@ -385,6 +387,87 @@ class ChapterLink(models.Model):
 
     def __str__(self):
         return self.url
+
+class Evaluation(models.Model):
+    title = models.CharField(max_length=200, blank=False)
+    online_class = models.ForeignKey(
+        OnlineClass, 
+        on_delete=models.CASCADE, 
+        related_name='evaluations',
+        help_text="Turma para a qual a avaliação se destina."
+    )
+    start_date = models.DateTimeField(help_text="Data e hora de início para a disponibilização da prova.")
+    end_date = models.DateTimeField(help_text="Data e hora de fim para o encerramento da prova.")
+    random_sort = models.BooleanField(default=False)
+    cancelled = models.BooleanField(default=False)
+    show_grades = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = _('Evaluation')
+        verbose_name_plural = _('Evaluations')
+
+    def __str__(self):
+        return f"{self.title} - {self.online_class.name}"
+    
+class EvaluationProblemTestCase(models.Model):
+    evaluation_problem = models.ForeignKey('EvaluationProblem', on_delete=models.CASCADE)
+    test_case = models.ForeignKey('TestCase', on_delete=models.CASCADE)
+    hidden = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('evaluation_problem', 'test_case')
+
+    def __str__(self):
+        visibility = "Visível" if not self.hidden else "Oculto"
+        return f"{self.evaluation_problem} - TC {self.test_case.id} ({visibility})"
+
+class EvaluationProblem(models.Model):
+    evaluation = models.ForeignKey(Evaluation, on_delete=models.CASCADE)
+    problem = models.ForeignKey(Problem, on_delete=models.CASCADE)
+    order = models.PositiveIntegerField()
+    weight = models.FloatField(default=1.0)
+    autocorrection = models.BooleanField(default=True)
+    selected_test_cases = models.ManyToManyField( 'TestCase', through='EvaluationProblemTestCase', related_name='evaluation_problems')
+
+    class Meta:
+        verbose_name = _('Evaluation Problem')
+        verbose_name_plural = _('Evaluation Problems')
+
+    def __str__(self):
+        return f"{self.evaluation.title} - {self.problem.title} ({self.order})"
+
+class UserEvaluation(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    evaluation = models.ForeignKey(Evaluation, on_delete=models.CASCADE)
+    start_time = models.DateTimeField(null=True, blank=True)
+    end_time = models.DateTimeField(null=True, blank=True)
+    score = models.FloatField(default=0.0)
+    submitted = models.BooleanField(default=False)
+    user_class = models.ForeignKey(OnlineClass, on_delete=models.PROTECT, null=True)
+
+    class Meta:
+        verbose_name = _('User Evaluation')
+        verbose_name_plural = _('User Evaluations')
+
+    def __str__(self):
+        return f"{self.user.username} - {self.evaluation.title}"
+
+class UserEvaluationProblem(models.Model):
+    user_evaluation = models.ForeignKey(UserEvaluation, on_delete=models.CASCADE)
+    evaluation_problem = models.ForeignKey(EvaluationProblem, on_delete=models.CASCADE)
+    solution = models.TextField(blank=True)
+    outcome = models.CharField(max_length=2, choices=UserLog.OUTCOMES, default="S")
+    seconds_in_question = models.IntegerField(default=0)
+    test_case_hits = models.IntegerField(default=0)
+    grade = models.FloatField(default=0.0)
+    feedback = models.TextField(blank=True, null=True)
+
+    class Meta:
+        verbose_name = _('User Evaluation Problem')
+        verbose_name_plural = _('User Evaluation Problems')
+
+    def __str__(self):
+        return f"{self.user_evaluation.user.username} - {self.evaluation_problem.problem.title}"
 
 @receiver(post_save, sender=User)
 @disable_for_loaddata

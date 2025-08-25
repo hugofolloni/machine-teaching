@@ -104,7 +104,7 @@ class ProblemAdmin(SimpleHistoryAdmin):
     list_display = ('id', 'title', 'content', 'chapter_all', 'question_type')
     search_fields = ['id', 'title']
     list_filter = ('chapter', 'question_type')
-    filter_horizontal = ('chapter',)
+    # filter_horizontal = ('chapter',)
     exclude = ('crawler', 'hint')
     inlines = (ExerciseSetInline,)
 

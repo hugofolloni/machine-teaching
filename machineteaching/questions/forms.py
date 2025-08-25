@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext as _
 from questions.models import (UserLog, OnlineClass, Chapter, Problem,
-                              Solution, PageAccess, Interactive, Deadline, Comment)
+                              Solution, PageAccess, Interactive, Deadline, Comment, Evaluation)
 import random
 import datetime
 
@@ -200,3 +200,20 @@ class CommentForm(ModelForm):
     class Meta:
         model = Comment
         exclude = ['user', 'userlog']
+
+class EvaluationForm(forms.ModelForm):
+    class Meta:
+        model = Evaluation
+        fields = ['title', 'start_date', 'end_date', 'random_sort']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control'}),
+            'start_date': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'end_date': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'random_sort': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+        labels = {
+            'title': 'Título da Avaliação',
+            'start_date': 'Data e Hora de Início',
+            'end_date': 'Data e Hora de Fim',
+            'random_sort': 'Embaralhar a ordem das questões para cada aluno',
+        }

@@ -1,0 +1,306 @@
+{% extends "questions/base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row g-4">
+
+        <div class="col-lg-4">
+            <div class="card p-4 shadow-sm mb-4">
+                <h3 class="mb-4">{{ evaluation.title }}</h3>
+                <p class="mb-1"><strong>Turma:</strong> {{ evaluation.online_class.name }}</p>
+                <p class="mb-1"><strong>Início:</strong> {{ evaluation.start_date|date:"d/m/Y H:i" }}</p>
+                <p><strong>Fim:</strong> {{ evaluation.end_date|date:"d/m/Y H:i" }}</p>
+                
+                <hr class="my-4">
+                
+                <div class="d-grid gap-2">
+                    <a href="{% url 'edit_evaluation' evaluation_id=evaluation.id %}" class="btn btn-outline-secondary">Editar Configurações</a>
+                    <form method="post" class="d-grid" onsubmit="return confirm('Tem certeza que deseja cancelar esta prova? Esta ação não pode ser desfeita.');">
+                        {% csrf_token %}
+                        <button type="submit" name="cancel_evaluation" class="btn btn-outline-danger">
+                            Cancelar Prova
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card p-4 shadow-sm">
+                <h4 class="mb-3">Adicionar Questões</h4>
+                <form method="get" class="mb-3">
+                    <div class="input-group">
+                        <input type="text" name="q" class="form-control" placeholder="Buscar questão..." value="{{ search_query }}">
+                        <button class="btn btn-outline-secondary" type="submit">Buscar</button>
+                        <a href="{% url 'create_evaluation_problem' evaluation_id=evaluation.id %}" class="btn btn-primary" title="Criar Nova Questão">+</a>
+                    </div>
+                </form>
+
+               {% if search_query %}
+                <div class="search-results">
+                    <h6>Resultados para "{{ search_query }}"</h6>
+                    <ul class="list-group" style="max-height: 300px; overflow-y: auto;">
+                        {% for problem in available_problems %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            
+                            <span class="question-title-clickable preview-btn" 
+                                  data-url="{% url 'get_problem_details' problem_id=problem.id %}">
+                                {{ problem.title }}
+                            </span>
+                            
+                            <form method="post" class="d-inline mb-0">
+                                {% csrf_token %}
+                                <input type="hidden" name="problem_id" value="{{ problem.id }}">
+                                <input type="hidden" name="search_query" value="{{ search_query }}">
+                                <button type="submit" name="add_question" class="btn btn-success btn-sm">Adicionar</button>
+                            </form>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item">Nenhuma questão encontrada.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card p-4 shadow-sm">
+                <h4 class="mb-3">Questões na Avaliação</h4>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="question-list-container">
+                        {% for ep in added_problems %}
+                        <div class="question-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <h6 class="question-title-clickable preview-btn" data-url="{% url 'get_problem_details' problem_id=ep.problem.id %}">
+                                    {{ ep.problem.title }}
+                                </h6>
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-outline-info btn-sm configure-testcases-btn"
+                                            data-ep-id="{{ ep.id }}"
+                                            data-get-url="{% url 'get_evaluation_problem_testcases_api' ep_id=ep.id %}"
+                                            data-save-url="{% url 'save_testcases_api' ep_id=ep.id %}">
+                                        Configurar Casos
+                                    </button>
+                                    <button type="submit" name="remove_question" value="{{ ep.id }}" class="btn btn-outline-danger btn-sm" aria-label="Excluir">&times;</button>
+                                </div>
+                            </div>
+                            <div class="mt-2 d-flex align-items-center">
+                                <label for="weight-{{ep.id}}" class="form-label form-label-sm mb-0">Peso:</label>
+                                <input type="number" name="weight-{{ep.id}}" id="weight-{{ep.id}}" value="{{ ep.weight|stringformat:'s' }}" min="0" step="0.1" class="form-control form-control-sm" style="width: 80px; margin-left: 20px;">
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted">Nenhuma questão foi adicionada ainda.</p>
+                        {% endfor %}
+                    </div>
+
+                    {% if added_problems %}
+                    <div class="text-end mt-4">
+                        <button type="submit" name="update_weights" class="btn btn-primary">Confirmar e Voltar</button>
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+
+        <div class="modal fade" id="previewQuestionModal" tabindex="-1" aria-labelledby="previewQuestionModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="previewQuestionModalLabel">Visualizando Questão</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <h3 id="modal-problem-title"></h3>
+                        <hr>
+                        <strong>Enunciado:</strong>
+                        <div id="modal-problem-content" style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 5px; min-height: 100px;"></div>
+                        <hr>
+                        <strong>Casos de Teste:</strong>
+                        <div id="modal-problem-testcases"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="configureTestCasesModal" tabindex="-1" aria-labelledby="configureTestCasesModalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="configureTestCasesModalLabel">Configurar Casos de Teste</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <p>Selecione os casos de teste a serem usados nesta prova e defina se serão ocultos para o aluno.</p>
+                <p><strong>Questão:</strong> <span id="modal-tc-problem-title">Carregando...</span></p>
+                <hr>
+                <div id="test-cases-form-container">
+                    <div class="d-flex justify-content-center">
+                        <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
+                    </div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="save-testcases-btn">Salvar Alterações</button>
+              </div>
+            </div>
+          </div>
+        </div>
+{% endblock %}
+
+{% block javascript %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const createModalEl = document.getElementById('createQuestionModal');
+    const createModal = createModalEl ? new bootstrap.Modal(createModalEl) : null;
+
+    const previewModalEl = document.getElementById('previewQuestionModal');
+    const previewModal = previewModalEl ? new bootstrap.Modal(previewModalEl) : null;
+
+    const configureModalEl = document.getElementById('configureTestCasesModal');
+    const configureModal = configureModalEl ? new bootstrap.Modal(configureModalEl) : null;
+
+    {% if problem_form.errors %}
+        createModal?.show();
+    {% endif %}
+
+    document.querySelectorAll('.preview-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            if (!previewModal) return;
+            const url = this.dataset.url;
+            const titleEl = document.getElementById('modal-problem-title');
+            const contentEl = document.getElementById('modal-problem-content');
+            const testcasesEl = document.getElementById('modal-problem-testcases');
+
+            titleEl.textContent = 'Carregando...';
+            contentEl.innerHTML = '<div class="spinner-border spinner-border-sm"></div>';
+            testcasesEl.innerHTML = '';
+            previewModal.show();
+
+            fetch(url).then(res => res.json()).then(data => {
+                if (data.error) throw new Error(data.error);
+                titleEl.textContent = data.title;
+                contentEl.innerHTML = data.content;
+                const tcList = document.createElement('ul');
+                tcList.className = 'list-group';
+                if (data.test_cases?.length > 0) {
+                    data.test_cases.forEach(tc => {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item';
+                        // Sanitize content before displaying
+                        const pre = document.createElement('pre');
+                        pre.className = 'mb-0';
+                        const code = document.createElement('code');
+                        code.textContent = tc.content;
+                        pre.appendChild(code);
+                        li.appendChild(pre);
+                        tcList.appendChild(li);
+                    });
+                    testcasesEl.innerHTML = '';
+                    testcasesEl.appendChild(tcList);
+                } else {
+                    testcasesEl.textContent = 'Nenhum caso de teste cadastrado.';
+                }
+            }).catch(err => {
+                titleEl.textContent = 'Erro';
+                contentEl.innerHTML = `<div class="alert alert-danger">Não foi possível carregar os detalhes da questão.</div>`;
+                console.error("Erro no fetch do preview:", err);
+            });
+        });
+    });
+
+    document.querySelectorAll('.configure-testcases-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            if (!configureModal) return;
+            const getUrl = this.dataset.getUrl;
+            const saveUrl = this.dataset.saveUrl;
+            const titleEl = document.getElementById('modal-tc-problem-title');
+            const containerEl = document.getElementById('test-cases-form-container');
+            const saveBtn = document.getElementById('save-testcases-btn');
+            
+            titleEl.textContent = 'Carregando...';
+            containerEl.innerHTML = `<div class="d-flex justify-content-center"><div class="spinner-border" role="status"></div></div>`;
+            saveBtn.disabled = true;
+            configureModal.show();
+
+            fetch(getUrl).then(res => res.json()).then(data => {
+                titleEl.textContent = data.problem_title;
+                let formHtml = '';
+                if (data.test_cases?.length > 0) {
+                    data.test_cases.forEach(tc => {
+                        const isChecked = tc.selected ? 'checked' : '';
+                        const isHiddenChecked = tc.hidden ? 'checked' : '';
+                        const isDisabled = !tc.selected ? 'disabled' : '';
+                        formHtml += `
+                            <div class="list-group-item">
+                                <div class="row align-items-center">
+                                    <div class="col-1">
+                                        <input class="form-check-input use-tc-checkbox" type="checkbox" name="selected_tc" value="${tc.id}" id="use_tc_${tc.id}" ${isChecked}>
+                                    </div>
+                                    <div class="col-8">
+                                        <pre class="mb-0"><code>${tc.content}</code></pre>
+                                    </div>
+                                    <div class="col-3">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input hidden-tc-checkbox" type="checkbox" name="hidden_tc" value="${tc.id}" id="hide_tc_${tc.id}" ${isHiddenChecked} ${isDisabled}>
+                                            <label class="form-check-label" for="hide_tc_${tc.id}">Oculto</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>`;
+                    });
+                } else {
+                    formHtml = '<p>Nenhum caso de teste encontrado para esta questão.</p>';
+                }
+                containerEl.innerHTML = formHtml;
+                saveBtn.disabled = false;
+            });
+
+            saveBtn.onclick = function() {
+                const selectedTestCases = [];
+                document.querySelectorAll('#test-cases-form-container .use-tc-checkbox:checked').forEach(checkbox => {
+                    const tcId = checkbox.value;
+                    const isHidden = document.getElementById(`hide_tc_${tcId}`).checked;
+                    selectedTestCases.push({ id: tcId, hidden: isHidden });
+                });
+
+                const csrfToken = document.querySelector('input[name=csrfmiddlewaretoken]').value;
+
+                fetch(saveUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                    body: JSON.stringify({ test_cases: selectedTestCases })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        configureModal.hide();
+                    } else {
+                        alert('Erro ao salvar: ' + (data.message || 'Erro desconhecido'));
+                    }
+                });
+            };
+            
+            containerEl.addEventListener('change', function(e) {
+                if (e.target.classList.contains('use-tc-checkbox')) {
+                    const tcId = e.target.value;
+                    document.getElementById(`hide_tc_${tcId}`).disabled = !e.target.checked;
+                }
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

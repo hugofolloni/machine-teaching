@@ -8,7 +8,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
 
-      <!-- stylesheets -->
+       <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
       <link rel="stylesheet" type="text/css" href="http://cdn.datatables.net/1.10.22/css/jquery.dataTables.min.css">
       <link rel="stylesheet" type="text/css" href="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.9.0/css/jquery.dataTables_themeroller.css">
       <link rel="stylesheet" type="text/css" href="{% static 'vendor/codemirror-5.58.2/lib/codemirror.css' %}"/>
@@ -31,6 +31,17 @@
 
     </head>
     <body>
+
+          {% if messages %}
+        <div class="message-container">
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
+        {% endif %}
         <div class="sidebar"><a href="http://machineteaching.tech" class="brand">Machine Teaching</a>
           <div class="menu-container">
             <ul class="menu">
@@ -66,34 +77,34 @@
           </div>
         </div>
         <div class="content">
-        <div class="topbar">
-          <div class="topbar-left">
-            <span class="close" onclick="closeMenu()">
-              <div class="menu-icon">
-                <div></div>
-                <div></div>
-                <div></div>
-              </div>
-            </span>
-            <span class="title">{{ title }}</span>
+          <div class="topbar">
+            <div class="topbar-left">
+              <span class="close" onclick="closeMenu()">
+                <div class="menu-icon">
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                </div>
+              </span>
+              <span class="title">{{ title }}</span>
+            </div>
+            <div class="topbar-right">
+              <span class="name">{% if user.first_name %}
+              {% blocktrans %}Hello{% endblocktrans %}, {{ user.first_name }} {{ user.last_name }}
+              {% endif %}<span>></span>
+              <div class="card dropdown">
+                {% if perms.questions.view_userlogview %}
+                <a class="link" href="{% url 'admin:index' %}" style="height: 2.2rem; margin-bottom: 2rem;">{% blocktrans %}Administration{% endblocktrans %}</a>
+                {% else %}
+                <a class="link" href="{% url 'edit_profile' %}" style="height: 2.2rem; margin-bottom: 2rem;">{% blocktrans %}Change class{% endblocktrans %}</a>
+                {% endif %}
+                <br>
+                <a class="link profile" href="{% url 'profile' %}" style="height: 2.2rem;">{% blocktrans %}Profile{% endblocktrans %}</a>
+                <br>
+                <a class="link logout" href="{% url 'logout' %}" style="height: 2.2rem;">{% blocktrans %}Logout{% endblocktrans %}</a>
+              </div></span>
+            </div>
           </div>
-          <div class="topbar-right">
-            <span class="name">{% if user.first_name %}
-            {% blocktrans %}Hello{% endblocktrans %}, {{ user.first_name }} {{ user.last_name }}
-            {% endif %}<span>></span>
-            <div class="card dropdown">
-              {% if perms.questions.view_userlogview %}
-              <a class="link" href="{% url 'admin:index' %}" style="height: 2.2rem; margin-bottom: 2rem;">{% blocktrans %}Administration{% endblocktrans %}</a>
-              {% else %}
-              <a class="link" href="{% url 'edit_profile' %}" style="height: 2.2rem; margin-bottom: 2rem;">{% blocktrans %}Change class{% endblocktrans %}</a>
-              {% endif %}
-              <br>
-              <a class="link profile" href="{% url 'profile' %}" style="height: 2.2rem;">{% blocktrans %}Profile{% endblocktrans %}</a>
-              <br>
-              <a class="link logout" href="{% url 'logout' %}" style="height: 2.2rem;">{% blocktrans %}Logout{% endblocktrans %}</a>
-            </div></span>
-          </div>
-        </div>
 
         <!-- Banner with a link to answer the Satisfaction Form, to be used in the last part of the semester. -->
         {% if SHOW_SATISFACTION_FORM %}
@@ -189,6 +200,8 @@
       </div>
       {% endif %}
 
+      {% block modals %}
+      {% endblock %}
 
       <!-- scripts -->
       <script type="text/javascript">
@@ -216,10 +229,9 @@
       </script>
 <!--       <script src="https://cdn.jsdelivr.net/pyodide/v0.17.0/full/pyodide.js"></script> -->
       <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-      <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"></script>
+      <!-- <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script> -->
+      <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/showdown/1.9.0/showdown.min.js" type="text/javascript"></script>
-      <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.3/js/bootstrap.min.js"></script>
       <script src="{% static 'vendor/codemirror-5.58.2/lib/codemirror-repl.js' %}"></script>
       <script src="{% static 'vendor/codemirror-5.58.2/lib/codemirror.js' %}"></script>
       <script src="{% static 'vendor/codemirror-5.58.2/mode/python/python.js' %}"></script>

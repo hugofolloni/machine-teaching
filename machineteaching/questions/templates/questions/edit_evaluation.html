@@ -1,0 +1,51 @@
+{% extends "questions/base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block content %}
+
+    <div class="col-lg-8 mx-auto my-5">
+        <div class="card p-4 p-md-5 shadow-sm">
+            <h2 class="text-center mb-4">{{ title }}</h2>
+            
+            <form method="post" novalidate>
+                {% csrf_token %}
+                
+                 {% for field in form %}
+                    {% if field.field.widget.input_type == 'checkbox' %}
+                        <div class="form-check mb-4">
+                            {{ field }}
+                            <label class="form-check-label" for="{{ field.id_for_label }}" style="margin-top: 1px;">
+                                {{ field.label }}
+                            </label>
+                            {% for error in field.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                    {% else %}
+                        <div class="mb-4">
+                            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}
+                            <small class="form-text text-muted">{{ field.help_text|safe }}</small>
+                            {% endif %}
+                            {% for error in field.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    {% endfor %}
+
+                <hr class="my-4">
+
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="{% url 'manage_evaluation' evaluation.id %}" class="btn btn-secondary">Cancelar</a>
+                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+{% endblock %}

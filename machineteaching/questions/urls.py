@@ -2,7 +2,7 @@ from django.urls import path
 from django.views.generic import TemplateView
 
 from . import views, context_processors
-from django.conf.urls import url
+from django.urls import re_path
 from django.views.static import serve
 from django.conf import settings
 from django.conf.urls.static import static
@@ -12,8 +12,8 @@ from .views import ProblemDetailView
 
 
 urlpatterns = [
-    url(r'^media/(?P<path>.*)$', serve,{'document_root': settings.MEDIA_ROOT}),
-    url(r'^static/(?P<path>.*)$', serve,{'document_root': settings.STATIC_ROOT}),
+    re_path(r'^media/(?P<path>.*)$', serve,{'document_root': settings.MEDIA_ROOT}),
+    re_path(r'^static/(?P<path>.*)$', serve,{'document_root': settings.STATIC_ROOT}),
     path('', views.index, name='index'),
     path('saveaccess', views.save_access, name='saveaccess'),
     path('saveinteractive', views.save_interactive, name='saveinteractive'),
@@ -74,6 +74,16 @@ urlpatterns = [
 
     # View to redirect to embed form
     path('satisfaction_form', views.satisfaction_form, name='satisfaction_form'),
+    path('classes/manage/<int:onlineclass_id>/evaluations/new/', views.create_evaluation, name='create_evaluation'),
+    path('evaluations/manage/<int:evaluation_id>/', views.manage_evaluation, name='manage_evaluation'),
+    path('evaluations/edit/<int:evaluation_id>/', views.edit_evaluation, name='edit_evaluation'),
+    path('evaluations/manage/<int:evaluation_id>/add-question/', views.create_evaluation_problem, name='create_evaluation_problem'),
+    path('api/evaluation-problem/<int:ep_id>/testcases/', views.get_evaluation_problem_testcases_api, name='get_evaluation_problem_testcases_api'),
+    path('problem/<int:problem_id>/preview/', views.preview_problem, name='preview_problem'),
+    path('evaluation-problem/<int:ep_id>/configure-testcases/', views.configure_testcases, name='configure_testcases'),
+    path('api/evaluation-problem/<int:ep_id>/testcases/save/', views.save_testcases_api, name='save_testcases_api'),
+    path('api/problem/<int:problem_id>/details/', views.get_problem_details, name='get_problem_details'),
+
 ] 
 
 if settings.DEBUG:

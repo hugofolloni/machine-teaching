@@ -25,7 +25,7 @@ from questions.models import (Problem, Solution, UserLog, UserProfile,
                               Deadline, ExerciseSet, Recommendations, Comment, Language, TestCase, Evaluation, EvaluationProblem, UserEvaluation, EvaluationProblemTestCase)
 from questions.forms import (UserLogForm, SignUpForm, OutcomeForm, ChapterForm,
                              ProblemForm, SolutionForm, PageAccessForm, InteractiveForm,
-                             EditProfileForm, NewClassForm, DeadlineForm, CommentForm, EvaluationForm)
+                             EditProfileForm, NewClassForm, DeadlineForm, CommentForm, EvaluationForm, EvaluationProblemForm)
 from questions.serializers import RecommendationSerializer, ProblemSerializer
 from questions.get_problem import get_problem
 from questions.get_dashboards import student_dashboard, class_dashboard, manager_dashboard, predict_drop_out, time_to_finish_exercise, get_time_to_finish_chapter_in_days
@@ -1205,9 +1205,9 @@ def manage_evaluation(request, evaluation_id):
     search_query = request.GET.get('q', '')
     added_problem_ids = list(evaluation.evaluationproblem_set.values_list('problem__id', flat=True))
     
-    available_problems = Problem.objects.exclude(id__in=added_problem_ids)
+    available_problems = Problem.objects.exclude(id__in=added_problem_ids).filter(locked_problem=False).order_by('title')
     if search_query:
-        available_problems = available_problems.filter(title__icontains=search_query)
+        available_problems = available_problems.filter(title__icontains=search_query, locked_problem=False).order_by('title')
 
     context = {
         'title': f'Gerenciar Avaliação: {evaluation.title}',
@@ -1375,18 +1375,25 @@ def create_evaluation_problem(request, evaluation_id):
         raise PermissionDenied("Você não tem permissão para adicionar questões a esta avaliação.")
 
     if request.method == 'POST':
-        problem_form = ProblemForm(request.POST)
-        solution_form = SolutionForm(request.POST)
-
-        if problem_form.is_valid() and solution_form.is_valid():
+        form = EvaluationProblemForm(request.POST)
+        if form.is_valid():
             with transaction.atomic():
-                problem = problem_form.save(commit=False)
-                problem.question_type = solution_form.cleaned_data.get('question_type', 'C')
-                problem.save()
+                cleaned_data = form.cleaned_data
 
-                solution = solution_form.save(commit=False)
-                solution.problem = problem
-                solution.save()
+                problem = Problem.objects.create(
+                    title=cleaned_data.get('title'),
+                    content=cleaned_data.get('content'),
+                    question_type=cleaned_data.get('question_type'), 
+                    test_case_generator=cleaned_data.get('test_case_generator'),
+                    locked_problem=cleaned_data.get('locked_problem', False),
+                    evaluation_problem=True 
+                )
+
+                Solution.objects.create(
+                    problem=problem,
+                    header=f"# Solução para a questão '{problem.title}'",
+                    content="# N/A"
+                )
                 
                 EvaluationProblem.objects.create(
                     evaluation=evaluation,
@@ -1400,13 +1407,35 @@ def create_evaluation_problem(request, evaluation_id):
         else:
             error(request, 'Não foi possível criar a questão. Por favor, verifique os erros no formulário.')
     else:
-        problem_form = ProblemForm()
-        solution_form = SolutionForm()
+        form = EvaluationProblemForm()
 
     context = {
         'title': f'Nova Questão para "{evaluation.title}"',
         'evaluation': evaluation,
-        'problem_form': problem_form,
-        'solution_form': solution_form
+        'form': form 
     }
     return render(request, 'questions/create_evaluation_problem.html', context)
+
+@require_POST
+@login_required
+@permission_required('questions.change_evaluation', raise_exception=True)
+def update_question_order(request, evaluation_id):
+    evaluation = get_object_or_404(Evaluation, id=evaluation_id)
+    if not Professor.objects.filter(user=request.user, prof_class=evaluation.online_class).exists():
+        return JsonResponse({'status': 'error', 'message': 'Permission Denied'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        ordered_ids = data.get('ordered_ids')
+
+        if not ordered_ids:
+            return JsonResponse({'status': 'error', 'message': 'Nenhum ID fornecido.'}, status=400)
+
+        with transaction.atomic():
+            for index, ep_id in enumerate(ordered_ids):
+                EvaluationProblem.objects.filter(id=ep_id, evaluation_id=evaluation_id).update(order=index)
+
+        return JsonResponse({'status': 'success', 'message': 'Ordem atualizada com sucesso.'})
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)

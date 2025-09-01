@@ -400,6 +400,7 @@ class Evaluation(models.Model):
     end_date = models.DateTimeField(help_text="Data e hora de fim para o encerramento da prova.")
     random_sort = models.BooleanField(default=False)
     cancelled = models.BooleanField(default=False)
+    graded = models.BooleanField(default=False)
     show_grades = models.BooleanField(default=False)
 
     class Meta:

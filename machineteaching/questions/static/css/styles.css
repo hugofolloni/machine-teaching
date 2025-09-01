@@ -2364,10 +2364,6 @@ input:checked + .slider:before {
     text-decoration: underline;
 }
 
-.btn-primary {
-    min-width: 150px;
-}
-
 .message-container {
     position: fixed; 
     bottom: 8vh;    
@@ -2379,4 +2375,14 @@ input:checked + .slider:before {
 
 .message-container .alert {
     margin-bottom: 0.5rem;
+}
+
+.drag-handle {
+    color: rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+}
+
+.question-item:hover  .drag-handle {
+    color: rgba(0, 0, 0, 0.5);
 }

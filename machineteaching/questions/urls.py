@@ -83,7 +83,7 @@ urlpatterns = [
     path('evaluation-problem/<int:ep_id>/configure-testcases/', views.configure_testcases, name='configure_testcases'),
     path('api/evaluation-problem/<int:ep_id>/testcases/save/', views.save_testcases_api, name='save_testcases_api'),
     path('api/problem/<int:problem_id>/details/', views.get_problem_details, name='get_problem_details'),
-
+    path('evaluation/<int:evaluation_id>/manage/update-order/', views.update_question_order, name='update_question_order'),
 ] 
 
 if settings.DEBUG:

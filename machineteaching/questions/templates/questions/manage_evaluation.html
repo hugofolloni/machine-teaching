@@ -32,7 +32,7 @@
                     <div class="input-group">
                         <input type="text" name="q" class="form-control" placeholder="Buscar questão..." value="{{ search_query }}">
                         <button class="btn btn-outline-secondary" type="submit">Buscar</button>
-                        <a href="{% url 'create_evaluation_problem' evaluation_id=evaluation.id %}" class="btn btn-primary" title="Criar Nova Questão">+</a>
+                        <a href="{% url 'create_evaluation_problem' evaluation_id=evaluation.id %}" class="btn btn-primary px-2" onmouseover="this.style.border='1px solid black';"  onmouseout="this.style.border='1px solid #0d6efd';" title="Criar Nova Questão"><i class="bi bi-plus-lg"></i></a>
                     </div>
                 </form>
 
@@ -70,28 +70,37 @@
                 
                 <form method="post">
                     {% csrf_token %}
-                    <div class="question-list-container">
+                    <div class="question-list-container" id="question-list">
                         {% for ep in added_problems %}
-                        <div class="question-item">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <h6 class="question-title-clickable preview-btn" data-url="{% url 'get_problem_details' problem_id=ep.problem.id %}">
-                                    {{ ep.problem.title }}
-                                </h6>
-                                <div class="btn-group">
-                                    <button type="button" class="btn btn-outline-info btn-sm configure-testcases-btn"
-                                            data-ep-id="{{ ep.id }}"
-                                            data-get-url="{% url 'get_evaluation_problem_testcases_api' ep_id=ep.id %}"
-                                            data-save-url="{% url 'save_testcases_api' ep_id=ep.id %}">
-                                        Configurar Casos
-                                    </button>
-                                    <button type="submit" name="remove_question" value="{{ ep.id }}" class="btn btn-outline-danger btn-sm" aria-label="Excluir">&times;</button>
+                            <div class="question-item" data-id="{{ ep.id }}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    
+                                    <div class="d-flex align-items-center flex-grow-1 me-3"> 
+                                        <span class="drag-handle me-3">☰</span>
+                                        <h6 class="question-title-clickable preview-btn mb-0" data-url="{% url 'get_problem_details' problem_id=ep.problem.id %}">
+                                            {{ ep.problem.title }}
+                                        </h6>
+                                    </div>
+                                    
+                                    <div class="btn-group flex-shrink-0">
+                                        {% if ep.problem.question_type == 'C' %}
+                                        <button type="button" class="btn btn-outline-info btn-sm configure-testcases-btn"
+                                                data-ep-id="{{ ep.id }}"
+                                                data-get-url="{% url 'get_evaluation_problem_testcases_api' ep_id=ep.id %}"
+                                                data-save-url="{% url 'save_testcases_api' ep_id=ep.id %}">
+                                            Configurar Casos
+                                        </button>
+                                        {% endif %}
+                                        <button type="submit" name="remove_question" value="{{ ep.id }}" class="btn btn-outline-danger btn-sm px-3" aria-label="Excluir"><i class="bi bi-trash"></i></button>
+                                    </div>
+
+                                </div>
+
+                                <div class="mt-2 d-flex align-items-center">
+                                    <label for="weight-{{ep.id}}" class="form-label form-label-sm mb-0">Peso:</label>
+                                    <input type="number" name="weight-{{ep.id}}" id="weight-{{ep.id}}" value="{{ ep.weight|stringformat:'s' }}" min="0" step="0.1" class="form-control form-control-sm" style="width: 80px; margin-left: 20px;">
                                 </div>
                             </div>
-                            <div class="mt-2 d-flex align-items-center">
-                                <label for="weight-{{ep.id}}" class="form-label form-label-sm mb-0">Peso:</label>
-                                <input type="number" name="weight-{{ep.id}}" id="weight-{{ep.id}}" value="{{ ep.weight|stringformat:'s' }}" min="0" step="0.1" class="form-control form-control-sm" style="width: 80px; margin-left: 20px;">
-                            </div>
-                        </div>
                         {% empty %}
                         <p class="text-muted">Nenhuma questão foi adicionada ainda.</p>
                         {% endfor %}
@@ -302,5 +311,38 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+const questionListEl = document.getElementById('question-list');
+if (questionListEl) {
+    const updateOrderUrl = "{% url 'update_question_order' evaluation_id=evaluation.id %}";
+    const csrfToken = document.querySelector('input[name=csrfmiddlewaretoken]').value;
+
+    new Sortable(questionListEl, {
+        animation: 150,
+        handle: '.drag-handle', // Define que o arrasto só funciona no ícone
+        onEnd: function(evt) {
+            const orderedIds = Array.from(questionListEl.children).map(item => item.dataset.id);
+
+            fetch(updateOrderUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ 'ordered_ids': orderedIds })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    console.log('Ordem salva com sucesso!');
+                    // Você pode adicionar um toast/notificação de sucesso aqui
+                } else {
+                    console.error('Falha ao salvar a ordem:', data.message);
+                }
+            })
+            .catch(error => console.error('Erro no fetch:', error));
+        }
+    });
+}
 </script>
 {% endblock %}

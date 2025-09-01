@@ -217,3 +217,49 @@ class EvaluationForm(forms.ModelForm):
             'end_date': 'Data e Hora de Fim',
             'random_sort': 'Embaralhar a ordem das questões para cada aluno',
         }
+
+class EvaluationProblemForm(forms.ModelForm):
+    EVALUATION_QUESTION_TYPES = (
+        ("C", "Code"),
+        ("T", "Text"),
+    )
+    question_type = forms.ChoiceField(
+        choices=EVALUATION_QUESTION_TYPES,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Tipo da Questão'
+    )
+
+    class Meta:
+        model = Problem
+        fields = ['title', 'content', 'test_case_generator', 'locked_problem']
+        widgets = {
+            'question_type': forms.Select(attrs={'class': 'form-select'}),
+            'title': forms.TextInput(attrs={'class': 'form-control'}),
+            'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
+            'test_case_generator': forms.Textarea(attrs={'class': 'form-control', 'rows': 10, 'placeholder': 'def generate():\n    # Seu código aqui\n    return [ (entrada, saida), ... ]'}),
+            'locked_problem': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+        labels = {
+            'title': 'Título da Questão',
+            'content': 'Enunciado',
+            'test_case_generator': 'Gerador de Casos de Teste (para questões de código)',
+            'locked_problem': 'Questão privada (não pode ser usada em outras provas/listas)',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['test_case_generator'].required = False
+
+    def clean_test_case_generator(self):
+        test_case_generator = self.cleaned_data.get('test_case_generator')
+        question_type = self.cleaned_data.get('question_type')
+        if question_type == 'C' and test_case_generator:
+            try:
+                function_obj = compile(test_case_generator, 'generate()', 'exec')
+                exec(function_obj)
+                test_cases = eval('generate')()
+                if not isinstance(test_cases, list):
+                     raise forms.ValidationError("A função 'generate' deve retornar uma lista.")
+            except Exception as e:
+                raise forms.ValidationError(f"Erro ao compilar o gerador de casos de teste: {e}")
+        return test_case_generator

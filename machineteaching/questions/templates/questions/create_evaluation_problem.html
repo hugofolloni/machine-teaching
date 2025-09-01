@@ -2,79 +2,144 @@
 {% load i18n %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row justify-content-center">
-        <div class="col-lg-10">
-            <div class="card p-4 shadow-sm">
-                <h3 class="mb-4">
-                    {% blocktrans %}Nova Questão para a Avaliação: "{{ evaluation.title }}"{% endblocktrans %}
-                </h3>
+<style>
+    .layout-grid {
+        display: grid;
+        grid-template-columns: 40% 1fr;
+        gap: 2rem;
+        min-height: calc(100vh - 220px); 
+    }
+    .card-full-height {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    .card-body {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    .form-control, .form-select {
+        border-radius: 0.25rem !important;
+    }
+    textarea.form-control {
+        flex-grow: 1;
+    }
 
-                <form method="post" novalidate>
-                    {% csrf_token %}
+    .fake-code-editor {
+        background-color: #f8f9fa; 
+        border: 1px dashed #ced4da;
+        border-radius: 0.25rem;
+        padding: 1rem;
+        color: #6c757d;
+        font-family: monospace;
+        flex-grow: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+    }
+    
+    .test-case-container.disabled {
+        opacity: 0.5;
+        pointer-events: none; 
+    }
+    .test-case-container {
+        transition: opacity 0.3s ease;
+    }
 
-                    <fieldset class="border p-3 mb-4">
-                        <legend class="w-auto px-2 h5">Detalhes da Questão</legend>
-                        
-                        {% for field in problem_form %}
-                        <div class="mb-3">
-                            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                            {{ field }}
-                            {% if field.help_text %}
-                                <small class="form-text text-muted">{{ field.help_text }}</small>
-                            {% endif %}
-                            {% for error in field.errors %}
-                                <div class="text-danger small mt-1">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                        {% endfor %}
-                    </fieldset>
+</style>
 
-                    <fieldset class="border p-3 mb-4">
-                        <legend class="w-auto px-2 h5">Solução e Configuração</legend>
-                        
-                        {% for field in solution_form %}
-                        <div class="mb-3">
-                            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                            {{ field }}
-                            {% if field.help_text %}
-                                <small class="form-text text-muted">{{ field.help_text }}</small>
-                            {% endif %}
-                            {% for error in field.errors %}
-                                <div class="text-danger small mt-1">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                        {% endfor %}
-                    </fieldset>
+<div class="container-fluid mt-4">
+    <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="layout-grid">
 
-                    <div class="d-flex justify-content-end gap-2 mt-4">
-                        <a href="{% url 'manage_evaluation' evaluation_id=evaluation.id %}" class="btn btn-secondary">
-                            {% trans "Cancelar" %}
-                        </a>
-                        <button type="submit" class="btn btn-primary">
-                            {% trans "Criar e Adicionar Questão" %}
-                        </button>
+            <div class="card shadow-sm p-4 card-full-height">
+                <div class="card-body">
+                    <h5>{% trans "Definição do Problema" %}</h5>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.title.label }}</label>
+                        {{ form.title }}
                     </div>
-                </form>
+                    
+                    <div class="mb-3" style="flex-grow: 1; display: flex; flex-direction: column;">
+                        <label class="form-label">{{ form.content.label }}</label>
+                        {{ form.content }}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.question_type.label }}</label>
+                        {{ form.question_type }}
+                    </div>
+                    
+                    <div class="form-check my-2">
+                        {{ form.locked_problem }}
+                        <label class="form-check-label" for="{{ form.locked_problem.id_for_label }}">{{ form.locked_problem.label }}</label>
+                    </div>
+
+                    <div class="mt-auto pt-3 text-end">
+                        <a href="{% url 'manage_evaluation' evaluation_id=evaluation.id %}" class="btn btn-secondary">{% trans "Cancelar" %}</a>
+                        <button type="submit" class="btn btn-primary">{% trans "Criar Questão" %}</button>
+                    </div>
+                </div>
             </div>
+
+            <div style="display: flex; flex-direction: column; gap: 2rem;">
+                
+                <div class="card shadow-sm" style="flex: 1;">
+                    <div class="card-body">
+                        <div class="fake-code-editor">
+                            <!-- <span>(Área de solução)</span> -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm test-case-container" id="test-case-container" style="flex: 1;">
+                     <div class="card-body">
+                        <label class="form-label">{{ form.test_case_generator.label }}</label>
+                        {{ form.test_case_generator }}
+                    </div>
+                </div>
+            </div>
+
         </div>
-    </div>
+    </form>
 </div>
 {% endblock %}
 
 {% block javascript %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const forms = document.querySelectorAll('form');
-        forms.forEach(form => {
-            Array.from(form.elements).forEach(element => {
-                if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA' || element.tagName === 'SELECT') {
-                    if (element.type !== 'checkbox' && element.type !== 'radio') {
-                        element.classList.add('form-control');
-                    }
-                }
-            });
-        });
+document.addEventListener('DOMContentLoaded', function() {
+    // Adiciona classes do bootstrap
+    document.querySelectorAll('input[type="text"], textarea, select').forEach(el => {
+        if (!el.classList.contains('form-check-input')) {
+            el.classList.add('form-control');
+        }
     });
+
+    const questionTypeSelect = document.getElementById('{{ form.question_type.id_for_label }}');
+    const testCaseContainer = document.getElementById('test-case-container');
+    const testCaseTextarea = document.getElementById('{{ form.test_case_generator.id_for_label }}');
+
+    function toggleTestCaseInteractivity() {
+        const isCodeQuestion = questionTypeSelect.value === 'C';
+
+        if (isCodeQuestion) {
+            testCaseContainer.classList.remove('disabled');
+            testCaseTextarea.readOnly = false;
+        } else {
+            testCaseContainer.classList.add('disabled');
+            testCaseTextarea.readOnly = true;
+        }
+    }
+
+    // Executa na carga da página
+    toggleTestCaseInteractivity();
+
+    // Adiciona o listener para mudanças
+    questionTypeSelect.addEventListener('change', toggleTestCaseInteractivity);
+});
 </script>
 {% endblock %}

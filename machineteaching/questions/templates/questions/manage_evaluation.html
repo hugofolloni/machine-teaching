@@ -17,11 +17,13 @@
                 
                 <div class="d-grid gap-2">
                     {% if finished %}
-                    <a href="{% url 'edit_evaluation' evaluation_id=evaluation.id %}" class="btn btn-outline-secondary">Grading Dashboard</a>
+                        <a href="{% url 'grading_dashboard' evaluation_id=evaluation.id %}" class="btn btn-primary">Grading Dashboard</a>
                     {% endif %}
-                    {% if started %}
-                    <a href="{% url 'edit_evaluation' evaluation_id=evaluation.id %}" class="btn btn-outline-secondary">Edit Configurations</a>
+                    
+                    {% if not started %}
+                        <a href="{% url 'edit_evaluation' evaluation_id=evaluation.id %}" class="btn btn-outline-secondary">Edit Configurations</a>
                     {% endif %}
+                    
                     <form method="post" class="d-grid" onsubmit="return confirm('Are you sure you want to cancel this exam? This action cannot be undone.');">
                         {% csrf_token %}
                         <button type="submit" name="cancel_evaluation" class="btn btn-outline-danger">

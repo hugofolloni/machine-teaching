@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext as _
 from questions.models import (UserLog, OnlineClass, Chapter, Problem,
-                              Solution, PageAccess, Interactive, Deadline, Comment, Evaluation)
+                              Solution, PageAccess, Interactive, Deadline, Comment, Evaluation, UserEvaluationProblem)
 import random
 import datetime
 
@@ -263,3 +263,16 @@ class EvaluationProblemForm(forms.ModelForm):
             except Exception as e:
                 raise forms.ValidationError(f"Erro ao compilar o gerador de casos de teste: {e}")
         return test_case_generator
+    
+class GradeSubmissionForm(forms.ModelForm):
+    class Meta:
+        model = UserEvaluationProblem
+        fields = ['grade', 'feedback']
+        widgets = {
+            'grade': forms.NumberInput(attrs={'class': 'form-control'}),
+            'feedback': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+        }
+        labels = {
+            'grade': 'Final Grade for this Question',
+            'feedback': 'Feedback for Student'
+        }

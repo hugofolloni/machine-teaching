@@ -93,6 +93,11 @@ urlpatterns = [
     path('api/evaluation_problem/<int:uep_id>/public_test_cases/', views.get_public_test_cases, name='get_public_test_cases'),
     path('submit_exam/<int:user_evaluation_id>/', views.submit_exam, name='submit_exam'),
     path('exam/submitted/', views.submission_confirmation, name='submission_confirmation'),
+    path('evaluation/<int:evaluation_id>/grading/', views.grading_dashboard, name='grading_dashboard'),
+    path('evaluation/<int:evaluation_id>/run_autograder/', views.run_autograder, name='run_autograder'),
+    path('evaluation/<int:evaluation_id>/release_grades/', views.release_grades, name='release_grades'),
+    path('user_evaluation/<int:ue_id>/grade/', views.grade_student_submission, name='grade_student_submission'),
+    path('user_evaluation_problem/<int:uep_id>/grade/', views.grade_evaluation_problem, name='grade_evaluation_problem'),
 ]
 
 if settings.DEBUG:

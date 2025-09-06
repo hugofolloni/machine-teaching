@@ -12,6 +12,7 @@ from django.db.models.functions import Lower
 from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.core.exceptions import PermissionDenied
+from django.db.models import Sum
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -19,6 +20,8 @@ from rest_framework.response import Response
 import json
 import time
 import random
+import zipfile
+from io import BytesIO
 from datetime import datetime
 from statistics import mean
 from questions.models import (Problem, Solution, UserLog, UserProfile,
@@ -26,7 +29,7 @@ from questions.models import (Problem, Solution, UserLog, UserProfile,
                               Deadline, ExerciseSet, Recommendations, Comment, Language, TestCase, Evaluation, EvaluationProblem, UserEvaluation, EvaluationProblemTestCase, UserEvaluationProblem)
 from questions.forms import (UserLogForm, SignUpForm, OutcomeForm, ChapterForm,
                              ProblemForm, SolutionForm, PageAccessForm, InteractiveForm,
-                             EditProfileForm, NewClassForm, DeadlineForm, CommentForm, EvaluationForm, EvaluationProblemForm)
+                             EditProfileForm, NewClassForm, DeadlineForm, CommentForm, EvaluationForm, EvaluationProblemForm, GradeSubmissionForm)
 from questions.serializers import RecommendationSerializer, ProblemSerializer
 from questions.get_problem import get_problem
 from questions.get_dashboards import student_dashboard, class_dashboard, manager_dashboard, predict_drop_out, time_to_finish_exercise, get_time_to_finish_chapter_in_days
@@ -1649,3 +1652,163 @@ def submit_exam(request, user_evaluation_id):
 @login_required
 def submission_confirmation(request):
     return render(request, 'questions/exam_submission_confirmation.html', {'title': 'Submission Successful'})
+
+@login_required
+@permission_required('questions.change_evaluation', raise_exception=True)
+def grading_dashboard(request, evaluation_id):
+    evaluation = get_object_or_404(Evaluation, id=evaluation_id)
+    
+    submissions = UserEvaluation.objects.filter(
+        evaluation=evaluation,
+        submitted=True
+    ).order_by('user__first_name', 'user__last_name')
+
+    total_weight = evaluation.evaluationproblem_set.aggregate(
+        total=Sum('weight')
+    )['total'] or 0.0
+
+    total_questions = evaluation.evaluationproblem_set.count()
+
+    for sub in submissions:
+            answered_count = sub.userevaluationproblem_set.exclude(solution='').count()
+            sub.progress_string = f"{answered_count} of {total_questions}"
+
+    context = {
+        'title': f'Grading: {evaluation.title}',
+        'evaluation': evaluation,
+        'submissions': submissions,
+        'total_weight': total_weight,
+    }
+    return render(request, 'questions/grading_dashboard.html', context)
+
+@require_POST
+@login_required
+@permission_required('questions.change_evaluation', raise_exception=True)
+@transaction.atomic
+def run_autograder(request, evaluation_id):
+    evaluation = get_object_or_404(Evaluation, id=evaluation_id)
+    submissions = UserEvaluation.objects.filter(evaluation=evaluation, submitted=True)
+    
+    audience = settings.WORKER_NODE_HOST + settings.WORKER_NODE_PORT
+    endpoint = audience + "/multi_process"
+    
+    headers = {}
+    if os.getenv('ENVIRONMENT') == 'prod':
+        auth_req = google.auth.transport.requests.Request()
+        id_token = google.oauth2.id_token.fetch_id_token(auth_req, audience)
+        headers['Authorization'] = f'Bearer {id_token}'
+
+    for submission in submissions:
+        student_problems = submission.userevaluationproblem_set.all()
+
+        for uep in student_problems:
+            problem = uep.evaluation_problem.problem
+            if problem.question_type == 'C' and uep.solution:
+                
+                all_exam_test_cases = uep.evaluation_problem.evaluationproblemtestcase_set.all()
+                test_cases_to_run = [json.loads(eptc.test_case.content) for eptc in all_exam_test_cases]
+
+                solution_obj = Solution.objects.filter(problem=problem, language__name='Python', ignore=False).first()
+                if not solution_obj:
+                    LOGGER.error(f"No valid solution found for problem {problem.id} to grade UEP {uep.id}")
+                    continue
+
+                form_data = {
+                    'prog_lang': 'Python',
+                    'professor_code': solution_obj.content,
+                    'func': solution_obj.header,
+                    'return_type': solution_obj.return_type,
+                    'test_cases': json.dumps(test_cases_to_run),
+                    'problem_id': problem.id, 
+                }
+                
+                mem_zip = BytesIO()
+                with zipfile.ZipFile(mem_zip, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+                    zf.writestr("run_me", uep.solution)
+                mem_zip.seek(0)
+
+                files = {'file': ('extract-me.zip', mem_zip.read(), 'application/zip')}
+
+                try:
+                    response = requests.post(endpoint, data=form_data, files=files, headers=headers)
+                    response.raise_for_status()
+                    results = response.json()
+                    
+                    passed_count = sum(1 for item in results if item.get('result', {}).get('isCorrect'))
+                    total_count = len(test_cases_to_run)
+                    
+                    uep.test_case_hits = passed_count
+                    if total_count > 0:
+                        weight = uep.evaluation_problem.weight
+                        uep.grade = (passed_count / total_count) * weight
+                    else:
+                        uep.grade = 0
+                    
+                    uep.save()
+                    
+                except Exception as e:
+                    LOGGER.error(f"Auto-grader failed for UEP {uep.id}: {e}")
+                    continue
+        
+        submission.score = sum(uep.grade for uep in student_problems if uep.grade is not None)
+        submission.save()
+
+    evaluation.graded = True
+    evaluation.save()
+    success(request, 'The auto-grader has finished processing all submissions.')
+    return redirect('grading_dashboard', evaluation_id=evaluation.id)
+
+@require_POST
+@login_required
+@permission_required('questions.change_evaluation', raise_exception=True)
+def release_grades(request, evaluation_id):
+    evaluation = get_object_or_404(Evaluation, id=evaluation_id)
+    evaluation.show_grades = True
+    evaluation.save()
+    success(request, f'Grades for "{evaluation.title}" have been released to students.')
+    return redirect('grading_dashboard', evaluation_id=evaluation.id)
+
+@login_required
+@permission_required('questions.change_evaluation', raise_exception=True)
+def grade_student_submission(request, ue_id):
+    submission = get_object_or_404(UserEvaluation, id=ue_id)
+    problems = submission.userevaluationproblem_set.order_by('evaluation_problem__order')
+
+    total_weight = submission.evaluation.evaluationproblem_set.aggregate(
+        total=Sum('weight')
+    )['total'] or 0.0
+
+    context = {
+        'title': f'Grading for {submission.user.get_full_name()}',
+        'submission': submission,
+        'problems': problems,
+        'total_weight': total_weight, 
+    }
+    return render(request, 'questions/grade_student_submission.html', context)
+
+@login_required
+@permission_required('questions.change_evaluation', raise_exception=True)
+def grade_evaluation_problem(request, uep_id):
+    uep = get_object_or_404(UserEvaluationProblem, id=uep_id)
+    submission = uep.user_evaluation
+    
+    if request.method == 'POST':
+        form = GradeSubmissionForm(request.POST, instance=uep)
+        if form.is_valid():
+            form.save()
+            all_problems = submission.userevaluationproblem_set.all()
+            submission.score = sum(p.grade for p in all_problems if p.grade is not None)
+            submission.save()
+            
+            success(request, 'Grade and feedback saved successfully.')
+            return redirect('grade_student_submission', ue_id=submission.id)
+    else:
+        form = GradeSubmissionForm(instance=uep)
+        
+    context = {
+        'title': f'Grading: {uep.evaluation_problem.problem.title}',
+        'uep': uep,
+        'form': form, 
+        'style_right_card': 'height: calc(45vh - 30px);' if uep.evaluation_problem.problem.question_type == 'C' else 'height: 100%; margin: 0;'
+    }
+    return render(request, 'questions/grade_evaluation_problem.html', context)

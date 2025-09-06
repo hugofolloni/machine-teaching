@@ -1,0 +1,65 @@
+{% extends "questions/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="container-fluid p-4">
+
+    <div class="d-flex justify-content-end mb-5" style="margin-right: 2%">
+        <a href="{% url 'grading_dashboard' evaluation_id=submission.evaluation.id %}" class="btn btn-outline-secondary">
+            &larr; Back to Dashboard
+        </a>
+    </div>
+
+    <div style="display: flex; flex-direction: row; width: 100%;">
+        
+        <div class="col-lg-4 mx-3 w-30">
+            <div class="card p-4 shadow-sm sticky-top">
+                <h3 class="mb-3">{{ submission.user.get_full_name }}</h3>
+                <ul class="list-unstyled text-muted">
+                    <li class="mb-2"><strong>Exam:</strong><br>{{ submission.evaluation.title }}</li>
+                    <li class="mb-2"><strong>Class:</strong><br>{{ submission.user_class.name }}</li>
+                    <li class="mb-2"><strong>Submitted At:</strong><br>{{ submission.end_time|date:"d/m/Y H:i" }}</li>
+                </ul>
+                <hr>
+                <div>
+                    <h6 class="text-muted mb-1">Total Score</h6>
+                    <h3 class="text-primary mb-0">{{ submission.score|floatformat:2 }} / {{ total_weight|floatformat:2 }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 mx-3"  style="width: 62%;">
+            <div class="card p-4 shadow-sm" style='height: 60vh;'>
+                <h4 class="mb-3">Questions</h4>
+                <div class="list-group" style='height: 50vh; overflow-y: auto;'>
+                    {% for problem in problems %}
+                    <div class="list-group-item py-3">
+                        <div style="display: flex; flex-direction: row; width: 100%;">
+                            <div class="col-md-8">
+                                <h6 class="mb-1">
+                                    {% if problem.evaluation_problem.problem.question_type == 'C' %}
+                                        <i class="bi bi-code-slash me-2"></i>
+                                    {% else %}
+                                        <i class="bi bi-file-text me-2"></i>
+                                    {% endif %}
+                                    {{ problem.evaluation_problem.problem.title }}
+                                </h6>
+                                <small class="text-muted">
+                                    Partial Score: {{ problem.grade|floatformat:2 }} / {{ problem.evaluation_problem.weight|floatformat:2 }}
+                                </small>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <a href="{% url 'grade_evaluation_problem' uep_id=problem.id %}" class="btn btn-primary btn-sm">
+                                    Grade Question
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

@@ -2404,7 +2404,6 @@ input:checked + .slider:before {
 
 .exam-card {
     width: 70%;
-    /* background-color: red; */
     min-height: 70%;
     max-height: 85%;
     margin: 2rem auto;

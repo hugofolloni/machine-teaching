@@ -1,0 +1,72 @@
+{% extends "questions/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="card p-4 shadow-sm d-flex flex-column" style="height: 75vh;">
+        
+        <div class="d-flex justify-content-between align-items-center mb-5">
+            <div>
+                <h2 class="mb-1">{{ evaluation.title }}</h2>
+                <p class="text-muted mb-0">Class: {{ evaluation.online_class.name }}</p>
+            </div>
+            <div class="btn-group">
+                <form method="post" action="{% url 'run_autograder' evaluation_id=evaluation.id %}" class="me-2" onsubmit="return confirm('Are you sure you want to run the auto-grader? This will calculate initial grades for all coding questions.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-dark" {% if evaluation.graded %}disabled{% endif %}>
+                        {% if evaluation.graded %}Auto-Grader Run{% else %}Run Auto-Grader{% endif %}
+                    </button>
+                </form>
+                <form method="post" action="{% url 'release_grades' evaluation_id=evaluation.id %}" onsubmit="return confirm('Are you sure you want to release grades to all students? This action cannot be undone.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success" {% if evaluation.show_grades %}disabled{% endif %}>
+                        {% if evaluation.show_grades %}Grades Released{% else %}Release Grades{% endif %}
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="table-responsive flex-grow-1" style="overflow-y: auto;">
+            <table class="table table-hover align-middle">
+                <thead class="table-light sticky-top">
+                    <tr>
+                        <th style="width: 25%;">Student</th>
+                        <th style="width: 15%;">Submission Time</th>
+                        <th style="width: 15%;">Progress</th>
+                        <th style="width: 15%;">Submission Type</th>
+                        <th style="width: 10%;">Score</th>
+                        <th style="width: 20%;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sub in submissions %}
+                    <tr>
+                        <td>
+                            <h6 class="mb-0">{{ sub.user.first_name }} {{ sub.user.last_name }}</h6>
+                            <small class="text-muted">{{ sub.user.username }}</small>
+                        </td>
+                        <td>{{ sub.end_time|date:"d/m/Y H:i" }}</td>
+                        <td>{{ sub.progress_string }}</td>
+                        <td>
+                            {% if sub.end_time >= sub.evaluation.end_date %}
+                                <span class="badge bg-warning text-dark">Auto-Submitted</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark">Submitted On Time</span>
+                            {% endif %}
+                        </td>
+                        <td><strong>{{ sub.score|floatformat:2 }}</strong> / {{ total_weight|floatformat:2 }}</td>
+                        <td class="text-end">
+                            <a href="{% url 'grade_student_submission' ue_id=sub.id %}" class="btn btn-outline-primary btn-sm">Grade Submission</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-5">No submissions yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

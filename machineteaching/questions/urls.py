@@ -74,6 +74,7 @@ urlpatterns = [
 
     # View to redirect to embed form
     path('satisfaction_form', views.satisfaction_form, name='satisfaction_form'),
+
     path('classes/manage/<int:onlineclass_id>/evaluations/new/', views.create_evaluation, name='create_evaluation'),
     path('evaluations/manage/<int:evaluation_id>/', views.manage_evaluation, name='manage_evaluation'),
     path('evaluations/edit/<int:evaluation_id>/', views.edit_evaluation, name='edit_evaluation'),
@@ -84,7 +85,15 @@ urlpatterns = [
     path('api/evaluation-problem/<int:ep_id>/testcases/save/', views.save_testcases_api, name='save_testcases_api'),
     path('api/problem/<int:problem_id>/details/', views.get_problem_details, name='get_problem_details'),
     path('evaluation/<int:evaluation_id>/manage/update-order/', views.update_question_order, name='update_question_order'),
-] 
+    path('evaluation/<int:evaluation_id>/instructions/', views.evaluation_instructions, name='evaluation_instructions'),
+    path('evaluation/<int:evaluation_id>/start/', views.start_exam, name='start_exam'),
+    path('take_exam/<int:user_evaluation_id>/', views.take_exam, name='take_exam'),
+    path('evaluation_problem/<int:uep_id>/solve/', views.solve_evaluation_problem, name='solve_evaluation_problem'),
+    path('api/evaluation_problem/<int:uep_id>/save/', views.save_evaluation_progress, name='save_evaluation_progress'),
+    path('api/evaluation_problem/<int:uep_id>/public_test_cases/', views.get_public_test_cases, name='get_public_test_cases'),
+    path('submit_exam/<int:user_evaluation_id>/', views.submit_exam, name='submit_exam'),
+    path('exam/submitted/', views.submission_confirmation, name='submission_confirmation'),
+]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

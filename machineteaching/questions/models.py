@@ -396,8 +396,8 @@ class Evaluation(models.Model):
         related_name='evaluations',
         help_text="Turma para a qual a avaliação se destina."
     )
-    start_date = models.DateTimeField(help_text="Data e hora de início para a disponibilização da prova.")
-    end_date = models.DateTimeField(help_text="Data e hora de fim para o encerramento da prova.")
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField()
     random_sort = models.BooleanField(default=False)
     cancelled = models.BooleanField(default=False)
     graded = models.BooleanField(default=False)

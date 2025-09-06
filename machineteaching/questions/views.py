@@ -18,11 +18,12 @@ from rest_framework.response import Response
 # import random
 import json
 import time
+import random
 from datetime import datetime
 from statistics import mean
 from questions.models import (Problem, Solution, UserLog, UserProfile,
                               Professor, OnlineClass, UserLogView, Chapter,
-                              Deadline, ExerciseSet, Recommendations, Comment, Language, TestCase, Evaluation, EvaluationProblem, UserEvaluation, EvaluationProblemTestCase)
+                              Deadline, ExerciseSet, Recommendations, Comment, Language, TestCase, Evaluation, EvaluationProblem, UserEvaluation, EvaluationProblemTestCase, UserEvaluationProblem)
 from questions.forms import (UserLogForm, SignUpForm, OutcomeForm, ChapterForm,
                              ProblemForm, SolutionForm, PageAccessForm, InteractiveForm,
                              EditProfileForm, NewClassForm, DeadlineForm, CommentForm, EvaluationForm, EvaluationProblemForm)
@@ -201,62 +202,49 @@ def submit_code(request):
         #logging.info(f"audience: {audience}\nendpoint: {endpoint}")
         try:
             lang = form_data['prog_lang']
-            problem_id = form_data['problem_id']
-            problem = Problem.objects.get(pk=problem_id)
-            #form_data['problem_content'] = problem.content
-            #form_data['problem_title'] = problem.title
-            
-            found_solution = False
-            #Recuperando informações sobre soluções e casos de teste:
-            solutions = Solution.objects.filter(problem=problem, ignore=False)  #Pegando soluções de todas as linguagens
-            for solution in solutions:
-                if solution.language.name == lang and not solution.ignore:
-                    test_cases_lang = TestCase.objects.filter(problem=problem, languages=solution.language)
-                    #LOGGER.debug("Got test cases %s for problem %d", test_cases_lang, problem.id)
+            test_cases_to_run = []
 
-                    try:
-                        test_cases_lang_formatted = [json.loads(test_case.content) for test_case in test_cases_lang]
-                        form_data['test_cases'] = json.dumps(test_cases_lang_formatted)  #Serializa a lista em uma string
-                    except json.decoder.JSONDecodeError as e:
-                        custom_test_cases = []
-                        for test_case in test_cases_lang:
-                            custom_test_cases.append(test_case.content)
-                        form_data['test_cases'] = custom_test_cases
-                        form_data['custom_test_cases'] = True
+            if 'evaluation_problem_id' in form_data:
+                eval_problem = get_object_or_404(EvaluationProblem, id=form_data['evaluation_problem_id'])
+                problem = eval_problem.problem
+                public_test_cases = eval_problem.evaluationproblemtestcase_set.filter(hidden=False)
+                test_cases_to_run = [json.loads(ptc.test_case.content) for ptc in public_test_cases]
 
-                    professor_code = solution.content
-                    func = solution.header
-                    return_type = solution.return_type
-                    form_data['professor_code'] = professor_code
-                    form_data['func'] = func
-                    form_data['return_type'] = return_type
-                    found_solution = True
-                    break
-                   
-            if not found_solution:
-                return JsonResponse({"error": "Error on getting solution and test cases"}, status=400)
+            else: 
+                problem_id = form_data['problem_id']
+                problem = Problem.objects.get(pk=problem_id)
+                all_test_cases = TestCase.objects.filter(problem=problem)
+                try:
+                    test_cases_to_run = [json.loads(tc.content) for tc in all_test_cases]
+                except json.decoder.JSONDecodeError:
+                    test_cases_to_run = [tc.content for tc in all_test_cases]
+                    form_data['custom_test_cases'] = True
 
-            #Enviando os dados para o worker-node:
-            if os.getenv('ENVIRONMENT') == 'prod':    #Se estiver em produção, é necessário autenticação
+            form_data['test_cases'] = json.dumps(test_cases_to_run)
+            form_data['problem_id'] = problem.id 
+
+            solution = Solution.objects.filter(problem=problem, language__name=lang, ignore=False).first()
+            if not solution:
+                return JsonResponse({"error": "No valid solution found for this problem/language."}, status=400)
+
+            form_data['professor_code'] = solution.content
+            form_data['func'] = solution.header
+            form_data['return_type'] = solution.return_type
+
+            if os.getenv('ENVIRONMENT') == 'prod':
                 auth_req = google.auth.transport.requests.Request()
                 id_token = google.oauth2.id_token.fetch_id_token(auth_req, audience)
                 headers = { 'Authorization': f'Bearer {id_token}' }
-                #logging.info("com google")
                 response = requests.post(endpoint, data=form_data, files=files, headers=headers)
             else:
-                #logging.info("sem google")
                 response = requests.post(endpoint, data=form_data, files=files)
                 
-            response.raise_for_status()  # Levanta exceção se o status não for 200
-            flask_response = response.json()  # Converte a resposta em JSON
+            response.raise_for_status()
+            return JsonResponse(response.json(), safe=False)
 
-            return JsonResponse(flask_response, safe=False)    #Preciso do safe=False já que o worker-node retorna uma lista de dicionários
-        except requests.exceptions.RequestException as e:
-            print("Request exception:", str(e))
-            return JsonResponse({"error": "Failed to communicate with Worker-Node", "details": str(e)}, status=500)
         except Exception as e:
-            print("Unexpected exception:", str(e))
-            return JsonResponse({"error": "Unexpected error", "details": str(e)}, status=500)
+            LOGGER.error(f"Unexpected exception in submit_code: {e}")
+            return JsonResponse({"error": "An unexpected server error occurred.", "details": str(e)}, status=500)
 
     return JsonResponse({"error": "Invalid request method"}, status=400)
 
@@ -802,9 +790,7 @@ def classes(request):
 @permission_required('questions.view_userlogview', raise_exception=True)
 def manage_class(request, onlineclass):
     if request.method == "POST":
-        # ... (seu código de处理 POST para adicionar capítulos permanece o mesmo) ...
-        # ...
-        pass # Apenas para ilustrar que o bloco POST não muda
+        pass 
     else:
         form = DeadlineForm()
     
@@ -815,7 +801,6 @@ def manage_class(request, onlineclass):
             pk__in=professors).order_by(Lower('first_name').asc(), Lower('last_name').asc())
         students_list = []
         for student in students:
-            # ... (seu código para prever dropout permanece o mesmo) ...
             try:
                 dropout = predict_drop_out(student.id, onlineclass, datetime.now())
                 students_list.append({'student':student, 'predict': dropout})
@@ -828,14 +813,13 @@ def manage_class(request, onlineclass):
             chapter = Chapter.objects.get(deadline=deadline)
             chapters.append({'chapter':chapter, 'deadline':deadline})
 
-        # --- LÓGICA NOVA ADICIONADA AQUI ---
         evaluations_list = []
         now = timezone.now()
         all_evaluations = Evaluation.objects.filter(online_class=onlineclass, cancelled=False).order_by('-start_date')
 
         for evaluation in all_evaluations:
             status_text = ''
-            status_color = '' # Usaremos cores do Bootstrap
+            status_color = '' 
 
             if now > evaluation.end_date:
                 status_text = 'Finalizada'
@@ -853,14 +837,13 @@ def manage_class(request, onlineclass):
                 'status': status_text,
                 'status_color': status_color,
             })
-        # --- FIM DA LÓGICA NOVA ---
 
         return render(request, 'questions/show_class.html', {'title': onlineclass.name,
                                                             'students_list': students_list,
                                                             'chapters': chapters,
                                                             'onlineclass': onlineclass,
                                                             'form': form,
-                                                            'evaluations': evaluations_list}) # Adiciona a lista ao contexto
+                                                            'evaluations': evaluations_list}) 
     else:
         raise PermissionDenied()
 
@@ -1012,6 +995,24 @@ def start(request):
                                               ).distinct()
     failed = userlog.filter(outcome='F').values_list('problem_id', flat=True
                                               ).distinct()
+    
+    now = timezone.now()
+
+    current_evaluations = Evaluation.objects.filter(
+        online_class=onlineclass,
+        cancelled=False,
+        start_date__lte=now,
+        end_date__gte=now,
+        ).order_by('end_date')
+
+    active_evaluations_id = []
+
+    for ev in current_evaluations:
+        ue = UserEvaluation.objects.filter(user=request.user,evaluation=ev).first()
+        if not ue or not ue.submitted:
+            active_evaluations_id.append(ev.id)
+
+    active_evaluations = current_evaluations.filter(id__in=active_evaluations_id)
 
     return render(request, 'questions/home.html', {'title': _('home'),
                                                    'progress': progress,
@@ -1025,7 +1026,9 @@ def start(request):
                                                    'problems': problems,
                                                    'passed': passed,
                                                    'failed': failed,
-                                                   'skipped': skipped})
+                                                   'skipped': skipped,
+                                                   'active_evaluations': active_evaluations  
+                                                })
 
 # View to redirect to the satisfation form
 def satisfaction_form(request):
@@ -1145,7 +1148,7 @@ def create_evaluation(request, onlineclass_id):
     context = {
         'form': form,
         'online_class': online_class,
-        'title': f'Nova Avaliação para {online_class.name}'
+        'title': f'New Assessment for {online_class.name}'
     }
     return render(request, 'questions/create_evaluation.html', context)
 
@@ -1156,7 +1159,7 @@ def manage_evaluation(request, evaluation_id):
     online_class = evaluation.online_class
 
     if not Professor.objects.filter(user=request.user, prof_class=online_class).exists():
-        raise PermissionDenied("Você não tem permissão para gerenciar esta avaliação.")
+        raise PermissionDenied("You do not have permission to manage this exam.")
 
     problem_form = ProblemForm()
     
@@ -1165,14 +1168,25 @@ def manage_evaluation(request, evaluation_id):
         if 'add_question' in request.POST:
             problem_id = request.POST.get('problem_id')
             problem = get_object_or_404(Problem, id=problem_id)
-            _, created = EvaluationProblem.objects.get_or_create(
-                evaluation=evaluation, problem=problem,
-                defaults={'weight': 1.0, 'order': evaluation.evaluationproblem_set.count() + 1}
-            )
-            if created:
-                success(request, f'A questão "{problem.title}" foi adicionada.')
-            else:
-                error(request, f'A questão "{problem.title}" já está na avaliação.')
+            
+            with transaction.atomic():
+                eval_problem, created = EvaluationProblem.objects.get_or_create(
+                    evaluation=evaluation, problem=problem,
+                    defaults={'weight': 1.0, 'order': evaluation.evaluationproblem_set.count() + 1}
+                )
+
+                if created:
+                    all_test_cases = problem.testcase_set.all()
+                    for tc in all_test_cases:
+                        EvaluationProblemTestCase.objects.create(
+                            evaluation_problem=eval_problem,
+                            test_case=tc,
+                            hidden=False  
+                        )
+                    success(request, f'The question "{problem.title}" was added with all test cases selected by default.')
+                else:
+                    error(request, f'The question "{problem.title}" is already in the exam.')
+            
             search_query = request.POST.get('search_query', '')
             return redirect(f"{request.path}?q={search_query}")
 
@@ -1181,7 +1195,7 @@ def manage_evaluation(request, evaluation_id):
             eval_problem = get_object_or_404(EvaluationProblem, id=evaluation_problem_id)
             problem_title = eval_problem.problem.title
             eval_problem.delete()
-            success(request, f'A questão "{problem_title}" foi removida da avaliação.')
+            success(request, f'The question "{problem_title}" was removed from the exam.')
             return redirect('manage_evaluation', evaluation_id=evaluation.id)
 
         elif 'update_weights' in request.POST:
@@ -1193,18 +1207,18 @@ def manage_evaluation(request, evaluation_id):
                             weight_value = float(value.replace(',', '.')) 
                             if weight_value >= 0:
                                 EvaluationProblem.objects.filter(id=ep_id, evaluation=evaluation).update(weight=weight_value)
-                success(request, 'Prova atualizada com sucesso.')
+                success(request, 'Exam updated successfuly.')
             except (ValueError, TypeError):
-                error(request, 'Erro ao atualizar os pesos. Verifique se todos os valores são numéricos e válidos.')
+                error(request, 'Error updating exam.')
             return redirect('manage_class', onlineclass=evaluation.online_class.id)
 
         elif 'cancel_evaluation' in request.POST:
             if evaluation.start_date > timezone.now():
                 evaluation.cancelled = True
                 evaluation.save()
-                success(request, 'A prova foi cancelada com sucesso.')
+                success(request, 'The exam was cancelled.')
             else:
-                error(request, 'Não é possível cancelar uma prova que já começou ou terminou.')
+                error(request, 'Is not possible to edit an already started exam.')
             return redirect('manage_class', onlineclass=evaluation.online_class.id)
 
     search_query = request.GET.get('q', '')
@@ -1215,12 +1229,14 @@ def manage_evaluation(request, evaluation_id):
         available_problems = available_problems.filter(title__icontains=search_query, locked_problem=False).order_by('title')
 
     context = {
-        'title': f'Gerenciar Avaliação: {evaluation.title}',
+        'title': f'Manage exam: {evaluation.title}',
         'evaluation': evaluation,
         'added_problems': evaluation.evaluationproblem_set.order_by('order'),
         'available_problems': available_problems[:20], 
         'search_query': search_query,
         'problem_form': problem_form, 
+        'started': timezone.now() > evaluation.start_date,
+        'finished': timezone.now() > evaluation.end_date
     }
     return render(request, 'questions/manage_evaluation.html', context)
 
@@ -1228,7 +1244,6 @@ def manage_evaluation(request, evaluation_id):
 @require_POST
 @login_required
 def save_testcases_api(request, ep_id):
-    """ Salva a configuração de casos de teste enviada pelo modal. """
     eval_problem = get_object_or_404(EvaluationProblem, id=ep_id)
     
     if not Professor.objects.filter(user=request.user, prof_class=eval_problem.evaluation.online_class).exists():
@@ -1262,14 +1277,14 @@ def edit_evaluation(request, evaluation_id):
     evaluation = get_object_or_404(Evaluation, id=evaluation_id)
 
     if evaluation.start_date <= timezone.now():
-        error(request, "Não é possível editar uma avaliação que já começou ou terminou.")
+        error(request, "Is not possible to edit an already started exam.")
         return redirect('manage_evaluation', evaluation_id=evaluation.id)
 
     if request.method == 'POST':
         form = EvaluationForm(request.POST, instance=evaluation)
         if form.is_valid():
             form.save()
-            success(request, 'Avaliação atualizada com sucesso.')
+            success(request, 'Exam updated successfuly')
             return redirect('manage_evaluation', evaluation_id=evaluation.id)
     else:
         form = EvaluationForm(instance=evaluation)
@@ -1277,7 +1292,7 @@ def edit_evaluation(request, evaluation_id):
     context = {
         'form': form,
         'evaluation': evaluation,
-        'title': f'Editar Avaliação: {evaluation.title}'
+        'title': f'Edit Exam: {evaluation.title}'
     }
     return render(request, 'questions/edit_evaluation.html', context)
 
@@ -1333,7 +1348,7 @@ def preview_problem(request, problem_id):
     context = {
         'problem': problem,
         'test_cases': problem.testcase_set.all(),
-        'title': f'Visualizando: {problem.title}'
+        'title': f'Viewing: {problem.title}'
     }
     return render(request, 'questions/preview_problem.html', context)
 
@@ -1357,7 +1372,7 @@ def configure_testcases(request, ep_id):
                     test_case=test_case,
                     hidden=is_hidden
                 )
-        success(request, 'Configuração de casos de teste salva com sucesso.')
+        success(request, 'Test Case Configuration saved successfuly.')
         return redirect('manage_evaluation', evaluation_id=eval_problem.evaluation.id)
 
     saved_configs = eval_problem.evaluationproblemtestcase_set.all()
@@ -1367,7 +1382,7 @@ def configure_testcases(request, ep_id):
         'eval_problem': eval_problem,
         'all_test_cases': all_test_cases,
         'saved_choices': saved_choices,
-        'title': f'Configurar Casos de Teste para "{eval_problem.problem.title}"'
+        'title': f'Configure Test Cases for "{eval_problem.problem.title}"'
     }
     return render(request, 'questions/configure_testcases.html', context)
 
@@ -1377,7 +1392,7 @@ def create_evaluation_problem(request, evaluation_id):
     evaluation = get_object_or_404(Evaluation, id=evaluation_id)
     
     if not Professor.objects.filter(user=request.user, prof_class=evaluation.online_class).exists():
-        raise PermissionDenied("Você não tem permissão para adicionar questões a esta avaliação.")
+        raise PermissionDenied("You do not have permission to add questions to this Exam.")
 
     if request.method == 'POST':
         form = EvaluationProblemForm(request.POST)
@@ -1407,15 +1422,15 @@ def create_evaluation_problem(request, evaluation_id):
                     order=evaluation.evaluationproblem_set.count() + 1
                 )
 
-            success(request, f'A questão "{problem.title}" foi criada e adicionada à avaliação com sucesso.')
+            success(request, f'The questions "{problem.title}" was added successfuly.')
             return redirect('manage_evaluation', evaluation_id=evaluation.id)
         else:
-            error(request, 'Não foi possível criar a questão. Por favor, verifique os erros no formulário.')
+            error(request, 'It was not possible to add question.')
     else:
         form = EvaluationProblemForm()
 
     context = {
-        'title': f'Nova Questão para "{evaluation.title}"',
+        'title': f'New Questions for "{evaluation.title}"',
         'evaluation': evaluation,
         'form': form 
     }
@@ -1440,7 +1455,197 @@ def update_question_order(request, evaluation_id):
             for index, ep_id in enumerate(ordered_ids):
                 EvaluationProblem.objects.filter(id=ep_id, evaluation_id=evaluation_id).update(order=index)
 
-        return JsonResponse({'status': 'success', 'message': 'Ordem atualizada com sucesso.'})
+        return JsonResponse({'status': 'success', 'message': 'Updated order .'})
 
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    
+@login_required
+def evaluation_instructions(request, evaluation_id):
+    evaluation = get_object_or_404(Evaluation, id=evaluation_id)
+
+    if request.user.userprofile.user_class != evaluation.online_class:
+        raise PermissionDenied("You do not have permission to view this exam.")
+
+    context = {
+        'title': f'Instructions: {evaluation.title}',
+        'evaluation': evaluation
+    }
+    return render(request, 'questions/evaluation_instructions.html', context)
+
+@login_required
+@require_POST 
+def start_exam(request, evaluation_id):
+    evaluation = get_object_or_404(Evaluation, id=evaluation_id)
+    user = request.user
+
+    if user.userprofile.user_class != evaluation.online_class:
+        raise PermissionDenied("You are not in the correct class for this exam.")
+
+    now = timezone.now()
+    if not (evaluation.start_date <= now <= evaluation.end_date):
+        error(request, "This exam is not currently active.")
+        return redirect('start') 
+
+    existing_session = UserEvaluation.objects.filter(user=user, evaluation=evaluation).first()
+    if existing_session:
+        return redirect('take_exam', user_evaluation_id=existing_session.id)
+
+    try:
+        with transaction.atomic():
+            user_evaluation_session = UserEvaluation.objects.create(
+                user=user,
+                evaluation=evaluation,
+                start_time=now,
+                user_class=user.userprofile.user_class
+            )
+
+            questions_in_exam = evaluation.evaluationproblem_set.all()
+            for question in questions_in_exam:
+                UserEvaluationProblem.objects.create(
+                    user_evaluation=user_evaluation_session,
+                    evaluation_problem=question
+                )
+        
+        return redirect('take_exam', user_evaluation_id=user_evaluation_session.id)
+
+    except Exception as e:
+        LOGGER.error(f"Failed to start exam for user {user.id} on evaluation {evaluation.id}: {e}")
+        error(request, "An unexpected error occurred while starting the exam. Please try again.")
+        return redirect('evaluation_instructions', evaluation_id=evaluation.id)
+
+@login_required
+def take_exam(request, user_evaluation_id):
+    user_evaluation = get_object_or_404(UserEvaluation, id=user_evaluation_id)
+
+    if user_evaluation.user != request.user:
+        raise PermissionDenied("You do not have permission to access this exam session.")
+
+    if user_evaluation.submitted:
+        error(request, "You have already submitted this exam.")
+        return redirect('start')
+    
+    problems_qs = user_evaluation.userevaluationproblem_set.all().order_by('evaluation_problem__order')
+    
+    problems_list = list(problems_qs)
+    
+    if user_evaluation.evaluation.random_sort:
+        random.seed(user_evaluation.id)
+        random.shuffle(problems_list)
+
+    evaluation_duration = user_evaluation.evaluation.end_date - user_evaluation.evaluation.start_date
+    time_elapsed = timezone.now() - user_evaluation.start_time
+    remaining_time = evaluation_duration - time_elapsed
+    remaining_seconds = max(0, int(remaining_time.total_seconds()))
+
+    print("remaining", remaining_seconds)
+    context = {
+        'title': f"In Progress: {user_evaluation.evaluation.title}",
+        'user_evaluation': user_evaluation,
+        'problems': problems_list,
+        'remaining_seconds': remaining_seconds,
+    }
+    
+    return render(request, 'questions/take_exam.html', context)
+
+@login_required
+def solve_evaluation_problem(request, uep_id):
+    user_eval_problem = get_object_or_404(UserEvaluationProblem, id=uep_id)
+    user_evaluation = user_eval_problem.user_evaluation
+
+    if user_evaluation.user != request.user:
+        raise PermissionDenied("You do not have permission to access this problem.")
+
+    evaluation_duration = user_evaluation.evaluation.end_date - user_evaluation.evaluation.start_date
+    time_elapsed = timezone.now() - user_evaluation.start_time
+    remaining_time = evaluation_duration - time_elapsed
+    remaining_seconds = max(0, int(remaining_time.total_seconds()))
+    
+    problems_qs = user_evaluation.userevaluationproblem_set.all().order_by('evaluation_problem__order')
+    
+    problems_list = list(problems_qs)
+
+    if user_evaluation.evaluation.random_sort:
+        random.seed(user_evaluation.id)
+        random.shuffle(problems_list)
+
+    problem_ids = []
+
+    for problem in problems_list:
+        problem_ids.append(problem.id)
+
+    current_index = problem_ids.index(uep_id)
+    
+    prev_uep_id = problem_ids[current_index - 1] if current_index > 0 else None
+    next_uep_id = problem_ids[current_index + 1] if current_index < len(problem_ids) - 1 else None
+
+    context = {
+        'title': f"Solving: {user_eval_problem.evaluation_problem.problem.title}",
+        'problem': user_eval_problem,
+        'remaining_seconds': remaining_seconds,
+        'user_evaluation_id': user_evaluation.id,
+        'prev_uep_id': prev_uep_id,
+        'next_uep_id': next_uep_id
+    }
+    return render(request, 'questions/solve_evaluation_problem.html', context)
+
+@login_required
+@require_POST
+def save_evaluation_progress(request, uep_id):
+    try:
+        user_eval_problem = get_object_or_404(UserEvaluationProblem, id=uep_id)
+
+        if user_eval_problem.user_evaluation.user != request.user:
+            return JsonResponse({'status': 'error', 'message': 'Permission Denied'}, status=403)
+        
+        data = json.loads(request.body)
+        solution_text = data.get('solution', '')
+        
+        user_eval_problem.solution = solution_text
+        user_eval_problem.save()
+        
+        return JsonResponse({'status': 'success'})
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    
+@login_required
+def get_public_test_cases(request, uep_id):
+    user_eval_problem = get_object_or_404(UserEvaluationProblem, id=uep_id)
+
+    if user_eval_problem.user_evaluation.user != request.user:
+        return JsonResponse({'error': 'Permission Denied'}, status=403)
+    
+    eval_problem = user_eval_problem.evaluation_problem
+
+    public_test_cases = eval_problem.evaluationproblemtestcase_set.filter(hidden=False)
+    
+    test_cases_data = [json.loads(ptc.test_case.content) for ptc in public_test_cases]
+
+    return JsonResponse({'test_cases': test_cases_data})
+
+def submit_exam(request, user_evaluation_id):
+    user_evaluation = get_object_or_404(UserEvaluation, id=user_evaluation_id)
+
+    if user_evaluation.user != request.user:
+        raise PermissionDenied
+    
+    if user_evaluation.submitted:
+        error(request, "This exam has already been submitted.")
+        return redirect('start')
+        
+    if timezone.now() > user_evaluation.evaluation.end_date:
+        error(request, "The deadline for this exam has passed.")
+        return redirect('start')
+
+    user_evaluation.submitted = True
+    user_evaluation.end_time = timezone.now()
+    user_evaluation.save()
+
+    success(request, f'Your submission for "{user_evaluation.evaluation.title}" was successful.')
+    return redirect('submission_confirmation')
+
+
+@login_required
+def submission_confirmation(request):
+    return render(request, 'questions/exam_submission_confirmation.html', {'title': 'Submission Successful'})

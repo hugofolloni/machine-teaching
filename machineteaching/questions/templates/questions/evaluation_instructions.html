@@ -1,0 +1,68 @@
+{% extends "questions/base.html" %}
+{% load i18n %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="col-lg-9">
+        <div class="card p-4 p-md-5 shadow-sm text-center">
+            <h2 class="mb-2">{{ evaluation.title }}</h2>
+            <p class="lead text-muted">{% blocktrans %}This exam is available for a limited time.{% endblocktrans %}</p>
+            
+            <div class="alert alert-info mt-3">
+                {% blocktrans %}Exam window closes in:{% endblocktrans %}
+                <h3 id="window-countdown" data-end-time="{{ evaluation.end_date.isoformat }}">--:--:--</h3>
+            </div>
+
+            <hr class="my-4">
+
+            <div class="alert alert-secondary text-start" role="alert">
+                <h4 class="alert-heading">{% blocktrans %}Important Rules{% endblocktrans %}</h4>
+                <ul class="list-unstyled">
+                    <li><i class="bi bi-stopwatch me-2"></i><strong>{% blocktrans %}Timed Session:{% endblocktrans %}</strong> {% blocktrans %}Once you begin, a timer for <strong>{{ evaluation.end_date|timeuntil:evaluation.start_date }}</strong> will start. It cannot be paused.{% endblocktrans %}</li>
+                    <li class="mt-2"><i class="bi bi-file-code me-2"></i><strong>{% blocktrans %}Attempts vs. Submission:{% endblocktrans %}</strong> {% blocktrans %}For coding questions, you can 'Run' your code multiple times to check it against public test cases. This is an 'attempt'. You only have <strong>one final 'Submission'</strong> for grading.{% endblocktrans %}</li>
+                    <li class="mt-2"><i class="bi bi-box-arrow-right me-2"></i><strong>{% blocktrans %}Final Submission:{% endblocktrans %}</strong> {% blocktrans %}Your work is saved as you go, but you must click 'Submit Exam' at the end. If the timer runs out, your latest saved answers will be submitted automatically.{% endblocktrans %}</li>
+                </ul>
+            </div>
+            
+            <form method="post" action="{% url 'start_exam' evaluation_id=evaluation.id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary btn-lg mt-4">
+                    {% blocktrans %}I understand, Start Exam{% endblocktrans %}
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const countdownElement = document.getElementById('window-countdown');
+    const endTime = new Date(countdownElement.dataset.endTime);
+
+    const timerInterval = setInterval(updateCountdown, 1000);
+
+    function updateCountdown() {
+        const now = new Date();
+        const remainingTime = endTime - now;
+
+        if (remainingTime <= 0) {
+            clearInterval(timerInterval);
+            countdownElement.textContent = "{% blocktrans %}Exam window closed.{% endblocktrans %}";
+            document.querySelector('button[type="submit"]').disabled = true;
+            return;
+        }
+
+        const hours = Math.floor(remainingTime / (1000 * 60 * 60)).toString().padStart(2, '0');
+        const minutes = Math.floor((remainingTime / 1000 / 60) % 60).toString().padStart(2, '0');
+        const seconds = Math.floor((remainingTime / 1000) % 60).toString().padStart(2, '0');
+
+        countdownElement.textContent = `${hours}:${minutes}:${seconds}`;
+    }
+
+    updateCountdown();
+});
+</script>
+{% endblock %}

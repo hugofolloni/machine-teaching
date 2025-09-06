@@ -2386,3 +2386,58 @@ input:checked + .slider:before {
 .question-item:hover  .drag-handle {
     color: rgba(0, 0, 0, 0.5);
 }
+
+
+.exam-container {
+    max-width: 1400px;
+    margin: 0 ;
+}
+
+.countdown {
+    font-size: 1.2rem;
+    font-weight: 600;
+    background-color: #eeeeee;
+    padding: 5px 10px;
+    border-radius: 5px;
+    border: 2px solid #aaaaaa;
+}
+
+.exam-card {
+    width: 70%;
+    /* background-color: red; */
+    min-height: 70%;
+    max-height: 85%;
+    margin: 2rem auto;
+}
+
+.list-group {
+    max-height: 45vh;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+}
+
+.exam-question-item {
+    padding: 5%;
+    transition: background-color 0.2s ease-in-out;
+}
+
+.exam-question-item:hover {
+    background-color: #f9f9f9;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 12px;
+    display: inline-block; 
+    flex-shrink: 0;
+}
+
+.status-unanswered { 
+    background-color: #ced4da; 
+}
+
+.status-answered { 
+    background-color: #198754;
+}

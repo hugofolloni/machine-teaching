@@ -57,31 +57,31 @@
 
             <div class="card shadow-sm p-4 card-full-height">
                 <div class="card-body">
-                    <h5>{% trans "Definição do Problema" %}</h5>
+                    <h5>{% trans "Problem Content" %}</h5>
                     
                     <div class="mb-3">
-                        <label class="form-label">{{ form.title.label }}</label>
+                        <label class="form-label">Problem Title</label>
                         {{ form.title }}
                     </div>
                     
                     <div class="mb-3" style="flex-grow: 1; display: flex; flex-direction: column;">
-                        <label class="form-label">{{ form.content.label }}</label>
+                        <label class="form-label">Content</label>
                         {{ form.content }}
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">{{ form.question_type.label }}</label>
+                        <label class="form-label">Type</label>
                         {{ form.question_type }}
                     </div>
                     
                     <div class="form-check my-2">
                         {{ form.locked_problem }}
-                        <label class="form-check-label" for="{{ form.locked_problem.id_for_label }}">{{ form.locked_problem.label }}</label>
+                        <label class="form-check-label" for="{{ form.locked_problem.id_for_label }}">Private Question (could not be re-used in other assessments)</label>
                     </div>
 
                     <div class="mt-auto pt-3 text-end">
-                        <a href="{% url 'manage_evaluation' evaluation_id=evaluation.id %}" class="btn btn-secondary">{% trans "Cancelar" %}</a>
-                        <button type="submit" class="btn btn-primary">{% trans "Criar Questão" %}</button>
+                        <a href="{% url 'manage_evaluation' evaluation_id=evaluation.id %}" class="btn btn-secondary">{% trans "Cancel" %}</a>
+                        <button type="submit" class="btn btn-primary">{% trans "Create Question" %}</button>
                     </div>
                 </div>
             </div>
@@ -98,7 +98,7 @@
 
                 <div class="card shadow-sm test-case-container" id="test-case-container" style="flex: 1;">
                      <div class="card-body">
-                        <label class="form-label">{{ form.test_case_generator.label }}</label>
+                        <label class="form-label">Test Case Generator</label>
                         {{ form.test_case_generator }}
                     </div>
                 </div>

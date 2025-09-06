@@ -114,7 +114,36 @@
         </div>
 
 
-{% endblock %}}
+{% endblock %}
+
+{% block modals %}
+{% if active_evaluations %}
+{% with evaluation=active_evaluations.first %}
+<div class="modal fade" id="examAvailableModal" tabindex="-1" aria-labelledby="examModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="examModalLabel"><i class="bi bi-stopwatch-fill me-2"></i> {% blocktrans %}Exam Available{% endblocktrans %}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <h4 class="mb-3">{{ evaluation.title }}</h4>
+        <p>{% blocktrans %}This exam is currently in progress.{% endblocktrans %}</p>
+        <p class="text-muted">
+            {% blocktrans %}Available from:{% endblocktrans %} {{ evaluation.start_date|date:"d/m H:i" }}<br>
+            {% blocktrans %}Until:{% endblocktrans %} {{ evaluation.end_date|date:"d/m H:i" }}
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% blocktrans %}Do Later{% endblocktrans %}</button>
+        <a href="{% url 'evaluation_instructions' evaluation_id=evaluation.id %}" class="btn btn-primary">{% blocktrans %}Go to Exam{% endblocktrans %}</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endwith %}
+{% endif %}
+{% endblock %}
 
 {% block javascript %}
 <script type="text/javascript">
@@ -138,5 +167,11 @@
         });
     });
     
+    $(document).ready(function() {
+        {% if active_evaluations %}
+            var examModal = new bootstrap.Modal(document.getElementById('examAvailableModal'));
+            examModal.show();
+        {% endif %}
+    });
 </script>
 {% endblock %}

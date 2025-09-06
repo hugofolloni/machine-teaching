@@ -9,37 +9,42 @@
         <div class="col-lg-4">
             <div class="card p-4 shadow-sm mb-4">
                 <h3 class="mb-4">{{ evaluation.title }}</h3>
-                <p class="mb-1"><strong>Turma:</strong> {{ evaluation.online_class.name }}</p>
-                <p class="mb-1"><strong>Início:</strong> {{ evaluation.start_date|date:"d/m/Y H:i" }}</p>
-                <p><strong>Fim:</strong> {{ evaluation.end_date|date:"d/m/Y H:i" }}</p>
-                
+                <p class="mb-1"><strong>Class:</strong> {{ evaluation.online_class.name }}</p>
+                <p class="mb-1"><strong>Start:</strong> {{ evaluation.start_date|date:"d/m/Y H:i" }}</p>
+                <p><strong>End:</strong> {{ evaluation.end_date|date:"d/m/Y H:i" }}</p>
+
                 <hr class="my-4">
                 
                 <div class="d-grid gap-2">
-                    <a href="{% url 'edit_evaluation' evaluation_id=evaluation.id %}" class="btn btn-outline-secondary">Editar Configurações</a>
-                    <form method="post" class="d-grid" onsubmit="return confirm('Tem certeza que deseja cancelar esta prova? Esta ação não pode ser desfeita.');">
+                    {% if finished %}
+                    <a href="{% url 'edit_evaluation' evaluation_id=evaluation.id %}" class="btn btn-outline-secondary">Grading Dashboard</a>
+                    {% endif %}
+                    {% if started %}
+                    <a href="{% url 'edit_evaluation' evaluation_id=evaluation.id %}" class="btn btn-outline-secondary">Edit Configurations</a>
+                    {% endif %}
+                    <form method="post" class="d-grid" onsubmit="return confirm('Are you sure you want to cancel this exam? This action cannot be undone.');">
                         {% csrf_token %}
                         <button type="submit" name="cancel_evaluation" class="btn btn-outline-danger">
-                            Cancelar Prova
+                            Cancel Exam
                         </button>
                     </form>
                 </div>
             </div>
 
-            <div class="card p-4 shadow-sm">
-                <h4 class="mb-3">Adicionar Questões</h4>
+            <div class="card p-4 shadow-sm" style="height: 375px;">
+                <h4 class="mb-3">Add Questions</h4>
                 <form method="get" class="mb-3">
                     <div class="input-group">
-                        <input type="text" name="q" class="form-control" placeholder="Buscar questão..." value="{{ search_query }}">
-                        <button class="btn btn-outline-secondary" type="submit">Buscar</button>
+                        <input type="text" name="q" class="form-control" placeholder="Search question..." value="{{ search_query }}">
+                        <button class="btn btn-outline-secondary" type="submit">Search</button>
                         <a href="{% url 'create_evaluation_problem' evaluation_id=evaluation.id %}" class="btn btn-primary px-2" onmouseover="this.style.border='1px solid black';"  onmouseout="this.style.border='1px solid #0d6efd';" title="Criar Nova Questão"><i class="bi bi-plus-lg"></i></a>
                     </div>
                 </form>
 
                {% if search_query %}
                 <div class="search-results">
-                    <h6>Resultados para "{{ search_query }}"</h6>
-                    <ul class="list-group" style="max-height: 300px; overflow-y: auto;">
+                    <h6>Results for "{{ search_query }}"</h6>
+                    <ul class="list-group" style="max-height: 200px; overflow-y: auto;">
                         {% for problem in available_problems %}
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             
@@ -52,11 +57,11 @@
                                 {% csrf_token %}
                                 <input type="hidden" name="problem_id" value="{{ problem.id }}">
                                 <input type="hidden" name="search_query" value="{{ search_query }}">
-                                <button type="submit" name="add_question" class="btn btn-success btn-sm">Adicionar</button>
+                                <button type="submit" name="add_question" class="btn btn-success btn-sm">Add</button>
                             </form>
                         </li>
                         {% empty %}
-                        <li class="list-group-item">Nenhuma questão encontrada.</li>
+                        <li class="list-group-item">No questions founded.</li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -64,13 +69,13 @@
             </div>
         </div>
 
-        <div class="col-lg-8">
-            <div class="card p-4 shadow-sm">
-                <h4 class="mb-3">Questões na Avaliação</h4>
+        <div class="col-lg-8 h-75">
+            <div class="card p-4 shadow-sm" style="height: 80vh;">
+                <h4 class="mb-3">Questions in this Exam</h4>
                 
                 <form method="post">
                     {% csrf_token %}
-                    <div class="question-list-container" id="question-list">
+                    <div class="question-list-container" id="question-list" style="min-height: 60vh;">
                         {% for ep in added_problems %}
                             <div class="question-item" data-id="{{ ep.id }}">
                                 <div class="d-flex justify-content-between align-items-center">
@@ -88,7 +93,7 @@
                                                 data-ep-id="{{ ep.id }}"
                                                 data-get-url="{% url 'get_evaluation_problem_testcases_api' ep_id=ep.id %}"
                                                 data-save-url="{% url 'save_testcases_api' ep_id=ep.id %}">
-                                            Configurar Casos
+                                            Configure Test Cases
                                         </button>
                                         {% endif %}
                                         <button type="submit" name="remove_question" value="{{ ep.id }}" class="btn btn-outline-danger btn-sm px-3" aria-label="Excluir"><i class="bi bi-trash"></i></button>
@@ -97,18 +102,18 @@
                                 </div>
 
                                 <div class="mt-2 d-flex align-items-center">
-                                    <label for="weight-{{ep.id}}" class="form-label form-label-sm mb-0">Peso:</label>
+                                    <label for="weight-{{ep.id}}" class="form-label form-label-sm mb-0">Weight:</label>
                                     <input type="number" name="weight-{{ep.id}}" id="weight-{{ep.id}}" value="{{ ep.weight|stringformat:'s' }}" min="0" step="0.1" class="form-control form-control-sm" style="width: 80px; margin-left: 20px;">
                                 </div>
                             </div>
                         {% empty %}
-                        <p class="text-muted">Nenhuma questão foi adicionada ainda.</p>
+                        <p class="text-muted">No questions was added yet.</p>
                         {% endfor %}
                     </div>
 
                     {% if added_problems %}
                     <div class="text-end mt-4">
-                        <button type="submit" name="update_weights" class="btn btn-primary">Confirmar e Voltar</button>
+                        <button type="submit" name="update_weights" class="btn btn-primary">Confirm</button>
                     </div>
                     {% endif %}
                 </form>
@@ -124,20 +129,20 @@
             <div class="modal-dialog modal-xl">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="previewQuestionModalLabel">Visualizando Questão</h5>
+                        <h5 class="modal-title" id="previewQuestionModalLabel">Viewing question</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <h3 id="modal-problem-title"></h3>
                         <hr>
-                        <strong>Enunciado:</strong>
+                        <strong>Content:</strong>
                         <div id="modal-problem-content" style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 5px; min-height: 100px;"></div>
-                        <hr>
-                        <strong>Casos de Teste:</strong>
+                        {% comment %} <hr>
+                        <strong>Test Cases:</strong> {% endcomment %}
                         <div id="modal-problem-testcases"></div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>
             </div>
@@ -147,12 +152,12 @@
           <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
               <div class="modal-header">
-                <h5 class="modal-title" id="configureTestCasesModalLabel">Configurar Casos de Teste</h5>
+                <h5 class="modal-title" id="configureTestCasesModalLabel">Configure Test Cases</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
               </div>
               <div class="modal-body">
-                <p>Selecione os casos de teste a serem usados nesta prova e defina se serão ocultos para o aluno.</p>
-                <p><strong>Questão:</strong> <span id="modal-tc-problem-title">Carregando...</span></p>
+                <p>Select the test cases to be used, and define the visibility during the exam.</p>
+                <p><strong>Question:</strong> <span id="modal-tc-problem-title">Loading...</span></p>
                 <hr>
                 <div id="test-cases-form-container">
                     <div class="d-flex justify-content-center">
@@ -161,8 +166,8 @@
                 </div>
               </div>
               <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="save-testcases-btn">Salvar Alterações</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="save-testcases-btn">Save Changes</button>
               </div>
             </div>
           </div>
@@ -193,7 +198,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const contentEl = document.getElementById('modal-problem-content');
             const testcasesEl = document.getElementById('modal-problem-testcases');
 
-            titleEl.textContent = 'Carregando...';
+            titleEl.textContent = 'Loading...';
             contentEl.innerHTML = '<div class="spinner-border spinner-border-sm"></div>';
             testcasesEl.innerHTML = '';
             previewModal.show();
@@ -208,7 +213,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     data.test_cases.forEach(tc => {
                         const li = document.createElement('li');
                         li.className = 'list-group-item';
-                        // Sanitize content before displaying
                         const pre = document.createElement('pre');
                         pre.className = 'mb-0';
                         const code = document.createElement('code');
@@ -217,14 +221,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         li.appendChild(pre);
                         tcList.appendChild(li);
                     });
-                    testcasesEl.innerHTML = '';
+                    testcasesEl.innerHTML = '<hr><strong>Test Cases:</strong>'
                     testcasesEl.appendChild(tcList);
                 } else {
-                    testcasesEl.textContent = 'Nenhum caso de teste cadastrado.';
+                    testcasesEl.textContent = '';
                 }
             }).catch(err => {
-                titleEl.textContent = 'Erro';
-                contentEl.innerHTML = `<div class="alert alert-danger">Não foi possível carregar os detalhes da questão.</div>`;
+                titleEl.textContent = 'Error';
+                contentEl.innerHTML = `<div class="alert alert-danger">It was not possible to load question data.</div>`;
                 console.error("Erro no fetch do preview:", err);
             });
         });
@@ -239,7 +243,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const containerEl = document.getElementById('test-cases-form-container');
             const saveBtn = document.getElementById('save-testcases-btn');
             
-            titleEl.textContent = 'Carregando...';
+            titleEl.textContent = 'Loading...';
             containerEl.innerHTML = `<div class="d-flex justify-content-center"><div class="spinner-border" role="status"></div></div>`;
             saveBtn.disabled = true;
             configureModal.show();
@@ -271,7 +275,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>`;
                     });
                 } else {
-                    formHtml = '<p>Nenhum caso de teste encontrado para esta questão.</p>';
+                    formHtml = '<p>No test case founded.</p>';
                 }
                 containerEl.innerHTML = formHtml;
                 saveBtn.disabled = false;
@@ -319,7 +323,7 @@ if (questionListEl) {
 
     new Sortable(questionListEl, {
         animation: 150,
-        handle: '.drag-handle', // Define que o arrasto só funciona no ícone
+        handle: '.drag-handle', 
         onEnd: function(evt) {
             const orderedIds = Array.from(questionListEl.children).map(item => item.dataset.id);
 
@@ -335,7 +339,6 @@ if (questionListEl) {
             .then(data => {
                 if (data.status === 'success') {
                     console.log('Ordem salva com sucesso!');
-                    // Você pode adicionar um toast/notificação de sucesso aqui
                 } else {
                     console.error('Falha ao salvar a ordem:', data.message);
                 }

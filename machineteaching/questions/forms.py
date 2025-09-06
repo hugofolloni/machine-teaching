@@ -212,10 +212,10 @@ class EvaluationForm(forms.ModelForm):
             'random_sort': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
         labels = {
-            'title': 'Título da Avaliação',
-            'start_date': 'Data e Hora de Início',
-            'end_date': 'Data e Hora de Fim',
-            'random_sort': 'Embaralhar a ordem das questões para cada aluno',
+            'title': 'Exam Title',
+            'start_date': 'Start Time',
+            'end_date': 'End time',
+            'random_sort': 'Shuffle questions for each student',
         }
 
 class EvaluationProblemForm(forms.ModelForm):

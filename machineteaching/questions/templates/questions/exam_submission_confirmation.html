@@ -1,0 +1,16 @@
+{% extends "questions/base.html" %}
+{% load i18n %}
+
+{% block content %}
+
+    <div class="col-lg-8 mx-auto mt-5">
+        <div class="card p-5 shadow-sm">
+            <h2 class="text-success">{% blocktrans %}Exam Submitted Successfully!{% endblocktrans %}</h2>
+            <p class="lead mt-3">{% blocktrans %}Your answers have been recorded. You will be notified when your grade is available.{% endblocktrans %}</p>
+            <div class="mt-4">
+                <a href="{% url 'start' %}" class="btn btn-primary">{% blocktrans %}Back to Home{% endblocktrans %}</a>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}

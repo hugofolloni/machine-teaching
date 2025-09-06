@@ -1,0 +1,233 @@
+{% extends "questions/base.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block content %}
+<div class="container-fluid mt-4 exam-container">
+    <div class="row g-4">
+        <div class="col-lg-5" style="height: 80vh;">
+            <div class="card p-4 shadow-sm sticky-top h-100 d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="mb-0">{{ problem.evaluation_problem.problem.title }}</h4>
+                    <span class="countdown" id="countdown-timer" data-seconds="{{ remaining_seconds }}">--:--:--</span>
+                </div>
+                <hr>
+                <div class="problem-statement mb-3 flex-grow-1" style="overflow-y: auto;">
+                    {{ problem.evaluation_problem.problem.content|safe }}
+                </div>
+                <div class="mt-auto pt-3 border-top">
+                    <div class="d-flex justify-content-between">
+                        {% if prev_uep_id %}
+                            <a href="{% url 'solve_evaluation_problem' uep_id=prev_uep_id %}" class="btn btn-outline-secondary">&larr; {% blocktrans %}Previous{% endblocktrans %}</a>
+                        {% else %}
+                            <span class="btn btn-outline-secondary disabled">&larr; {% blocktrans %}Previous{% endblocktrans %}</span>
+                        {% endif %}
+                        
+                        <a href="{% url 'take_exam' user_evaluation_id=user_evaluation_id %}" class="btn btn-secondary">{% blocktrans %}Back to Question List{% endblocktrans %}</a>
+
+                        {% if next_uep_id %}
+                            <a href="{% url 'solve_evaluation_problem' uep_id=next_uep_id %}" class="btn btn-outline-secondary">{% blocktrans %}Next{% endblocktrans %} &rarr;</a>
+                        {% else %}
+                            <span class="btn btn-outline-secondary disabled">{% blocktrans %}Next{% endblocktrans %} &rarr;</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>{% blocktrans %}Your Solution{% endblocktrans %}</span>
+                    {% if problem.evaluation_problem.problem.question_type == 'C' %}<span class="badge bg-info">Python</span>{% endif %}
+                </div>
+                <div class="card-body">
+                    {% if problem.evaluation_problem.problem.question_type == 'C' %}
+                        <textarea id="code-editor" name="solution">{{ problem.solution|default:"" }}</textarea>
+                    {% else %}
+                        <textarea class="form-control" name="solution" style="min-height: 40vh;" placeholder="Type your answer here...">{{ problem.solution|default:"" }}</textarea>
+                    {% endif %}
+                </div>
+                {% if problem.evaluation_problem.problem.question_type == 'C' %}
+                <div class="card-footer text-center">
+                    <button type="button" class="btn btn-primary" id="run-code-btn">{% blocktrans %}Execute{% endblocktrans %}</button>
+                    <div class="spinner-border text-primary ms-3" id="code-loader" role="status" style="display: none;"><span class="visually-hidden">Loading...</span></div>
+                </div>
+                {% endif %}
+            </div>
+            
+            {% if problem.evaluation_problem.problem.question_type == 'C' %}
+            <div class="card shadow-sm" style='height: 31vh'>
+                <div class="card-header">{% blocktrans %}Test Cases{% endblocktrans %}</div>
+                <div class="card-body" id="test-case-results">
+                    <div class="overflow-auto" style="white-space: nowrap;">
+                        <ul class="nav nav-tabs flex-nowrap" id="testCaseTabs" role="tablist">
+                            </ul>
+                    </div>
+                    <div class="tab-content pt-3" id="testCaseTabContent">
+                        <p class="text-muted">{% blocktrans %}Click 'Execute' to run your code against the public test cases.{% endblocktrans %}</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascript %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const runBtn = document.getElementById('run-code-btn');
+    const loader = document.getElementById('code-loader');
+    const testCaseTabsContainer = document.getElementById('testCaseTabs');
+    const testCaseTabContentContainer = document.getElementById('testCaseTabContent');
+    const initialTestCaseMsg = document.getElementById('initial-test-case-msg'); 
+    const problemId = {{ problem.evaluation_problem.problem.id }};
+    const codeSubmitUrl = `{% url 'submit_code' %}`;
+    
+    if (runBtn) {
+        runBtn.addEventListener('click', async function() {
+            if (!codeEditor) return;
+
+            runBtn.disabled = true;
+            loader.style.display = 'inline-block';
+            testCaseTabsContainer.innerHTML = ''; 
+            testCaseTabContentContainer.innerHTML = '<p class="text-muted">{% blocktrans %}Executing...{% endblocktrans %}</p>'; 
+            if (initialTestCaseMsg) initialTestCaseMsg.style.display = 'none'; 
+            
+            try {
+                const userCode = codeEditor.getValue();
+                
+                const zip = new JSZip();
+                zip.file("run_me", userCode);
+                const zipBlob = await zip.generateAsync({ type: "blob" });
+
+                const formData = new FormData();
+                formData.append('prog_lang', 'Python');
+                formData.append('evaluation_problem_id', {{ problem.evaluation_problem.id }}); 
+                formData.append('file', zipBlob, 'extract-me.zip'); 
+
+                const executionResponse = await fetch(codeSubmitUrl, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken },
+                    body: formData
+                });
+
+                if (!executionResponse.ok) {
+                    throw new Error('Server communication error.');
+                }
+
+                const results = await executionResponse.json();
+                renderResults(results);
+
+            } catch (err) {
+                testCaseTabContentContainer.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+                console.error(err);
+            } finally {
+                runBtn.disabled = false;
+                loader.style.display = 'none';
+            }
+        });
+    }
+
+    function renderResults(resultsList) {
+        testCaseTabsContainer.innerHTML = '';
+        testCaseTabContentContainer.innerHTML = '';
+
+        if (!resultsList || !Array.isArray(resultsList) || resultsList.length === 0) {
+            testCaseTabContentContainer.innerHTML = `<div class="alert alert-warning">No results were returned.</div>`;
+            return;
+        }
+        
+        resultsList.forEach((item, index) => {
+            const result = item.result;
+            if (!result) return;
+
+            const isCorrect = result.isCorrect;
+            const tabId = `test-case-${index}`;
+            const isActive = (index === 0);
+
+            const tabButton = document.createElement('button');
+            tabButton.className = `nav-link ${isActive ? 'active' : ''}`;
+            tabButton.id = `${tabId}-tab`;
+            tabButton.setAttribute('data-bs-toggle', 'tab');
+            tabButton.setAttribute('data-bs-target', `#${tabId}`);
+            tabButton.type = 'button';
+            tabButton.role = 'tab';
+            tabButton.innerHTML = `Case ${index + 1} <span class="badge ms-2 ${isCorrect ? 'bg-success' : 'bg-danger'}">${isCorrect ? 'P' : 'F'}</span>`;
+            
+            const navItem = document.createElement('li');
+            navItem.className = 'nav-item';
+            navItem.role = 'presentation';
+            navItem.appendChild(tabButton);
+            testCaseTabsContainer.appendChild(navItem);
+            
+            const tabPane = document.createElement('div');
+            tabPane.className = `tab-pane fade ${isActive ? 'show active' : ''}`;
+            tabPane.id = tabId;
+            tabPane.role = 'tabpanel';
+            tabPane.innerHTML = `
+                <dl class="row">
+                  <dt class="col-sm-3">Input</dt>
+                  <dd class="col-sm-9"><pre><code>${result.test_case.split(' -> ')[0]}</code></pre></dd>
+                  <dt class="col-sm-3">Expected Output</dt>
+                  <dd class="col-sm-9"><pre><code>${result.prof_output}</code></pre></dd>
+                  <dt class="col-sm-3">Your Output</dt>
+                  <dd class="col-sm-9"><pre class="${isCorrect ? '' : 'text-danger'}"><code>${result.code_output}</code></pre></dd>
+                </dl>
+            `;
+            testCaseTabContentContainer.appendChild(tabPane);
+        });
+    }
+    
+    const timerElement = document.getElementById('countdown-timer');
+    let remainingSeconds = parseInt(timerElement.dataset.seconds, 10);
+    const timerInterval = setInterval(updateTimer, 1000);
+    function updateTimer() { if (remainingSeconds <= 0) { clearInterval(timerInterval); timerElement.textContent = "00:00:00"; return; } remainingSeconds--; const hours = Math.floor(remainingSeconds / 3600).toString().padStart(2, '0'); const minutes = Math.floor((remainingSeconds % 3600) / 60).toString().padStart(2, '0'); const seconds = (remainingSeconds % 60).toString().padStart(2, '0'); timerElement.textContent = `${hours}:${minutes}:${seconds}`; }
+    updateTimer();
+    const saveUrl = `{% url 'save_evaluation_progress' uep_id=problem.id %}`;
+    const csrfToken = '{{ csrf_token }}';
+    let codeEditor = null;
+    let plainTextarea = document.querySelector('textarea.form-control');
+    const codeTextarea = document.getElementById('code-editor');
+    if (codeTextarea) { codeEditor = CodeMirror.fromTextArea(codeTextarea, { mode: 'python', lineNumbers: true, indentUnit: 4, matchBrackets: true }); codeEditor.setSize('100%', '28vh'); }
+    const saveProgress = async () => { let currentSolution = ''; if (codeEditor) { currentSolution = codeEditor.getValue(); } else if (plainTextarea) { currentSolution = plainTextarea.value; } try { await fetch(saveUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }, body: JSON.stringify({ solution: currentSolution }) }); } catch (error) { console.error('Failed to save progress:', error); } };
+    setInterval(saveProgress, 10000);
+    window.addEventListener('beforeunload', saveProgress);
+
+    let isNavigatingInternally = false;
+
+    document.querySelectorAll('a.btn').forEach(link => {
+        link.addEventListener('click', () => {
+            isNavigatingInternally = true;
+        });
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden && !isNavigatingInternally) {
+            alert('Warning: Leaving the exam tab is not permitted and may be flagged for review.');
+            console.log('User switched tabs at ' + new Date().toLocaleTimeString());
+        }
+    });
+
+    const pasteWarning = (event) => {
+        event.preventDefault();
+        alert('Warning: Pasting content is not permitted.');
+    };
+
+    if (codeEditor) {
+        codeEditor.on('paste', (instance, event) => {
+            pasteWarning(event);
+        });
+    }
+
+    if (plainTextarea) {
+        plainTextarea.addEventListener('paste', pasteWarning);
+    }
+
+});
+</script>
+{% endblock %}

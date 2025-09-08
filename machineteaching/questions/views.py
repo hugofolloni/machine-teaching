@@ -16,7 +16,7 @@ from django.db.models import Sum
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-# import random
+from datetime import timedelta
 import json
 import time
 import random
@@ -1265,7 +1265,8 @@ def save_testcases_api(request, ep_id):
                     EvaluationProblemTestCase.objects.create(
                         evaluation_problem=eval_problem,
                         test_case=test_case,
-                        hidden=config.get('hidden', False)
+                        hidden=config.get('hidden', False),
+                        weight=config.get('weight', 1.0)
                     )
         
         return JsonResponse({'status': 'success', 'message': 'Configuração salva com sucesso.'})
@@ -1326,18 +1327,20 @@ def get_evaluation_problem_testcases_api(request, ep_id):
         return JsonResponse({'error': 'Permission Denied'}, status=403)
 
     all_test_cases = eval_problem.problem.testcase_set.all()
-
     saved_configs = EvaluationProblemTestCase.objects.filter(evaluation_problem=eval_problem)
     
-    saved_choices = {config.test_case_id: config.hidden for config in saved_configs}
+    saved_choices = {config.test_case_id: {'hidden': config.hidden, 'weight': config.weight} for config in saved_configs}
 
     response_data = []
     for tc in all_test_cases:
+        is_selected = tc.id in saved_choices
+        config = saved_choices.get(tc.id, {}) 
         response_data.append({
             'id': tc.id,
             'content': tc.content,
-            'selected': tc.id in saved_choices, 
-            'hidden': saved_choices.get(tc.id, False) 
+            'selected': is_selected, 
+            'hidden': config.get('hidden', False),
+            'weight': config.get('weight', 1.0) 
         })
         
     return JsonResponse({
@@ -1537,11 +1540,10 @@ def take_exam(request, user_evaluation_id):
         random.shuffle(problems_list)
 
     evaluation_duration = user_evaluation.evaluation.end_date - user_evaluation.evaluation.start_date
-    time_elapsed = timezone.now() - user_evaluation.start_time
-    remaining_time = evaluation_duration - time_elapsed
+    now = timezone.now()
+    remaining_time = user_evaluation.evaluation.end_date - now
     remaining_seconds = max(0, int(remaining_time.total_seconds()))
 
-    print("remaining", remaining_seconds)
     context = {
         'title': f"In Progress: {user_evaluation.evaluation.title}",
         'user_evaluation': user_evaluation,
@@ -1559,9 +1561,8 @@ def solve_evaluation_problem(request, uep_id):
     if user_evaluation.user != request.user:
         raise PermissionDenied("You do not have permission to access this problem.")
 
-    evaluation_duration = user_evaluation.evaluation.end_date - user_evaluation.evaluation.start_date
-    time_elapsed = timezone.now() - user_evaluation.start_time
-    remaining_time = evaluation_duration - time_elapsed
+    now = timezone.now()
+    remaining_time = user_evaluation.evaluation.end_date - now
     remaining_seconds = max(0, int(remaining_time.total_seconds()))
     
     problems_qs = user_evaluation.userevaluationproblem_set.all().order_by('evaluation_problem__order')
@@ -1637,12 +1638,17 @@ def submit_exam(request, user_evaluation_id):
         error(request, "This exam has already been submitted.")
         return redirect('start')
         
-    if timezone.now() > user_evaluation.evaluation.end_date:
+    grace_period = timedelta(seconds=30)
+    
+    if timezone.now() > user_evaluation.evaluation.end_date + grace_period:
         error(request, "The deadline for this exam has passed.")
         return redirect('start')
 
     user_evaluation.submitted = True
-    user_evaluation.end_time = timezone.now()
+    
+    now = timezone.now()
+    user_evaluation.end_time = min(now, user_evaluation.evaluation.end_date)
+    
     user_evaluation.save()
 
     success(request, f'Your submission for "{user_evaluation.evaluation.title}" was successful.')
@@ -1706,6 +1712,10 @@ def run_autograder(request, evaluation_id):
             if problem.question_type == 'C' and uep.solution:
                 
                 all_exam_test_cases = uep.evaluation_problem.evaluationproblemtestcase_set.all()
+                test_case_weights = {
+                    json.dumps(json.loads(eptc.test_case.content)): eptc.weight 
+                    for eptc in all_exam_test_cases
+                }
                 test_cases_to_run = [json.loads(eptc.test_case.content) for eptc in all_exam_test_cases]
 
                 solution_obj = Solution.objects.filter(problem=problem, language__name='Python', ignore=False).first()
@@ -1733,16 +1743,23 @@ def run_autograder(request, evaluation_id):
                     response = requests.post(endpoint, data=form_data, files=files, headers=headers)
                     response.raise_for_status()
                     results = response.json()
-                    
-                    passed_count = sum(1 for item in results if item.get('result', {}).get('isCorrect'))
-                    total_count = len(test_cases_to_run)
+
+                    passed_weight_sum = 0
+                    total_weight = sum(test_case_weights.values())
+                    passed_count = 0
+
+                    for item in results:
+                        if item.get('result', {}).get('isCorrect'):
+                            passed_count += 1
+                            tc_content_key = json.dumps(item.get('test_case'))
+                            passed_weight_sum += test_case_weights.get(tc_content_key, 0)
                     
                     uep.test_case_hits = passed_count
-                    if total_count > 0:
-                        weight = uep.evaluation_problem.weight
-                        uep.grade = (passed_count / total_count) * weight
+                    if total_weight > 0:
+                        question_max_score = uep.evaluation_problem.weight
+                        uep.grade = (passed_weight_sum / total_weight) * question_max_score
                     else:
-                        uep.grade = 0
+                        uep.grade = 0 if test_cases_to_run else uep.evaluation_problem.weight 
                     
                     uep.save()
                     
@@ -1750,7 +1767,11 @@ def run_autograder(request, evaluation_id):
                     LOGGER.error(f"Auto-grader failed for UEP {uep.id}: {e}")
                     continue
         
-        submission.score = sum(uep.grade for uep in student_problems if uep.grade is not None)
+        submission.score = sum(p.grade for p in student_problems if p.grade is not None)
+        
+        has_text_questions = submission.userevaluationproblem_set.filter(evaluation_problem__problem__question_type='T').exists()
+        has_ungraded_questions = submission.userevaluationproblem_set.filter(grade__isnull=True).exists()
+        submission.needs_manual_grading = has_text_questions or has_ungraded_questions
         submission.save()
 
     evaluation.graded = True
@@ -1798,6 +1819,10 @@ def grade_evaluation_problem(request, uep_id):
             form.save()
             all_problems = submission.userevaluationproblem_set.all()
             submission.score = sum(p.grade for p in all_problems if p.grade is not None)
+            
+            if not all_problems.filter(grade__isnull=True).exists():
+                submission.needs_manual_grading = False
+            
             submission.save()
             
             success(request, 'Grade and feedback saved successfully.')
@@ -1812,3 +1837,27 @@ def grade_evaluation_problem(request, uep_id):
         'style_right_card': 'height: calc(45vh - 30px);' if uep.evaluation_problem.problem.question_type == 'C' else 'height: 100%; margin: 0;'
     }
     return render(request, 'questions/grade_evaluation_problem.html', context)
+
+@login_required
+@permission_required('questions.view_evaluation', raise_exception=True)
+def export_grades_csv(request, evaluation_id):
+    evaluation = get_object_or_404(Evaluation, id=evaluation_id)
+    
+    if not Professor.objects.filter(user=request.user, prof_class=evaluation.online_class).exists():
+        raise PermissionDenied("You do not have permission to export grades for this exam.")
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="grades_{evaluation.title.replace(" ", "_")}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['Student Name', 'Email', 'Final Score'])
+
+    submissions = UserEvaluation.objects.filter(evaluation=evaluation, submitted=True).select_related('user')
+    for sub in submissions:
+        writer.writerow([
+            sub.user.get_full_name(),
+            sub.user.email,
+            f"{sub.score:.2f}"
+        ])
+
+    return response

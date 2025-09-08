@@ -265,9 +265,15 @@ class EvaluationProblemForm(forms.ModelForm):
         return test_case_generator
     
 class GradeSubmissionForm(forms.ModelForm):
+    show_test_cases_in_feedback = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        label='Show detailed test case results to student'
+    )
+
     class Meta:
         model = UserEvaluationProblem
-        fields = ['grade', 'feedback']
+        fields = ['grade', 'feedback', 'show_test_cases_in_feedback']
         widgets = {
             'grade': forms.NumberInput(attrs={'class': 'form-control'}),
             'feedback': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),

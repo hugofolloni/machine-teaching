@@ -18,12 +18,12 @@
                         {{ uep.evaluation_problem.problem.content|safe }}
                     </div>
 
-                    <form method="post">
+                    <form method="post" class="flex-grow-1 d-flex flex-column">
                         {% csrf_token %}
                         <div class="mb-3">
                             <label for="{{ form.grade.id_for_label }}" class="form-label d-flex justify-content-between">
                                 <span>{{ form.grade.label }} (Weight: {{ uep.evaluation_problem.weight }})</span>
-                                <strong id="grade-display">{{ form.grade.value|default:uep.grade|floatformat:2 }}</strong>
+                                <strong id="grade-display">{{ form.grade.value|default_if_none:uep.grade|default_if_none:"0.0"|floatformat:2 }}</strong>
                             </label>
                             <input 
                                 type="range" 
@@ -33,14 +33,21 @@
                                 min="0" 
                                 max="{{ uep.evaluation_problem.weight|stringformat:'s' }}" 
                                 step="0.25"
-                                value="{{ form.grade.value|default:uep.grade|stringformat:'s' }}"
+                                value="{{ form.grade.value|default_if_none:uep.grade|default_if_none:'0.0'|stringformat:'s' }}"
                                 style='border: none;'>
                         </div>
                         <div class="mb-3">
                             <label for="{{ form.feedback.id_for_label }}" class="form-label">{{ form.feedback.label }}</label>
                             {{ form.feedback }}
                         </div>
-                        <div class="d-grid">
+
+                        {% if uep.evaluation_problem.problem.question_type == 'C' %}
+                        <div class="form-check form-switch mb-3">
+                            {{ form.show_test_cases_in_feedback }}
+                            <label class="form-check-label" for="{{ form.show_test_cases_in_feedback.id_for_label }}">{{ form.show_test_cases_in_feedback.label }}</label>
+                        </div>
+                        {% endif %}
+                        <div class="d-grid mt-auto">
                             <button type="submit" class="btn btn-primary">Save</button>
                         </div>
                     </form>

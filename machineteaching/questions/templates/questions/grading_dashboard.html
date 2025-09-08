@@ -11,6 +11,8 @@
                 <p class="text-muted mb-0">Class: {{ evaluation.online_class.name }}</p>
             </div>
             <div class="btn-group">
+                <a href="{% url 'export_grades_csv' evaluation_id=evaluation.id %}" class="btn btn-info me-2">Export Grades (CSV)</a>
+
                 <form method="post" action="{% url 'run_autograder' evaluation_id=evaluation.id %}" class="me-2" onsubmit="return confirm('Are you sure you want to run the auto-grader? This will calculate initial grades for all coding questions.');">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-dark" {% if evaluation.graded %}disabled{% endif %}>
@@ -42,14 +44,19 @@
                     {% for sub in submissions %}
                     <tr>
                         <td>
-                            <h6 class="mb-0">{{ sub.user.first_name }} {{ sub.user.last_name }}</h6>
+                            <div class="d-flex align-items-center">
+                                <h6 class="mb-0 me-2">{{ sub.user.first_name }} {{ sub.user.last_name }}</h6>
+                                {% if sub.needs_manual_grading %}
+                                    <span class="badge bg-warning text-dark">Needs Review</span>
+                                {% endif %}
+                            </div>
                             <small class="text-muted">{{ sub.user.username }}</small>
                         </td>
                         <td>{{ sub.end_time|date:"d/m/Y H:i" }}</td>
                         <td>{{ sub.progress_string }}</td>
                         <td>
                             {% if sub.end_time >= sub.evaluation.end_date %}
-                                <span class="badge bg-warning text-dark">Auto-Submitted</span>
+                                <span class="badge bg-danger text-white">Auto-Submitted</span>
                             {% else %}
                                 <span class="badge bg-light text-dark">Submitted On Time</span>
                             {% endif %}

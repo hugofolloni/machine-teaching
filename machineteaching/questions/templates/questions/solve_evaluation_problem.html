@@ -3,6 +3,7 @@
 {% load i18n %}
 
 {% block content %}
+{% csrf_token %}
 <div class="container-fluid mt-4 exam-container">
     <div class="row g-4">
         <div class="col-lg-5" style="height: 80vh;">
@@ -61,8 +62,7 @@
                 <div class="card-header">{% blocktrans %}Test Cases{% endblocktrans %}</div>
                 <div class="card-body" id="test-case-results">
                     <div class="overflow-auto" style="white-space: nowrap;">
-                        <ul class="nav nav-tabs flex-nowrap" id="testCaseTabs" role="tablist">
-                            </ul>
+                        <ul class="nav nav-tabs flex-nowrap" id="testCaseTabs" role="tablist"></ul>
                     </div>
                     <div class="tab-content pt-3" id="testCaseTabContent">
                         <p class="text-muted">{% blocktrans %}Click 'Execute' to run your code against the public test cases.{% endblocktrans %}</p>
@@ -80,12 +80,78 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const timerElement = document.getElementById('countdown-timer');
+    if (timerElement) {
+        const remainingSeconds = parseInt(timerElement.dataset.seconds, 10);
+        const endTime = new Date().getTime() + remainingSeconds * 1000;
+
+        const timerInterval = setInterval(() => {
+            const now = new Date().getTime();
+            const timeleft = endTime - now;
+
+            if (timeleft < 0) {
+                clearInterval(timerInterval);
+                timerElement.textContent = "{% blocktrans %}Time is up!{% endblocktrans %}";
+                timerElement.classList.add('text-danger', 'fw-bold');
+                
+                alert("{% blocktrans %}Time is up! You will be returned to the main page to submit your exam.{% endblocktrans %}");
+                window.location.href = "{% url 'take_exam' user_evaluation_id=user_evaluation_id %}";
+                return;
+            }
+
+            const hours = Math.floor(timeleft / (1000 * 60 * 60)).toString().padStart(2, '0');
+            const minutes = Math.floor((timeleft % (1000 * 60 * 60)) / (1000 * 60)).toString().padStart(2, '0');
+            const seconds = Math.floor((timeleft % (1000 * 60)) / 1000).toString().padStart(2, '0');
+            timerElement.textContent = `${hours}:${minutes}:${seconds}`;
+        }, 1000);
+    }
+    
+    const csrfTokenInput = document.querySelector('[name=csrfmiddlewaretoken]');
+    const csrfToken = csrfTokenInput ? csrfTokenInput.value : '';
+
+    const saveUrl = `{% url 'save_evaluation_progress' uep_id=problem.id %}`;
+    let codeEditor = null;
+    let plainTextarea = document.querySelector('textarea.form-control');
+    const codeTextarea = document.getElementById('code-editor');
+    if (codeTextarea) { 
+        codeEditor = CodeMirror.fromTextArea(codeTextarea, { mode: 'python', lineNumbers: true, indentUnit: 4, matchBrackets: true });
+        codeEditor.setSize('100%', '28vh');
+    }
+
+    const saveProgress = async () => {
+        let currentSolution = '';
+        if (codeEditor) {
+            currentSolution = codeEditor.getValue();
+        } else if (plainTextarea) {
+            currentSolution = plainTextarea.value;
+        }
+
+        if (!csrfToken) {
+            console.error('CSRF Token not found. Auto-save is disabled.');
+            return;
+        }
+
+        try {
+            await fetch(saveUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ solution: currentSolution })
+            });
+        } catch (error) {
+            console.error('Failed to save progress:', error);
+        }
+    };
+
+    setInterval(saveProgress, 10000);
+    window.addEventListener('beforeunload', saveProgress);
+    
     const runBtn = document.getElementById('run-code-btn');
     const loader = document.getElementById('code-loader');
     const testCaseTabsContainer = document.getElementById('testCaseTabs');
     const testCaseTabContentContainer = document.getElementById('testCaseTabContent');
-    const initialTestCaseMsg = document.getElementById('initial-test-case-msg'); 
-    const problemId = {{ problem.evaluation_problem.problem.id }};
     const codeSubmitUrl = `{% url 'submit_code' %}`;
     
     if (runBtn) {
@@ -96,7 +162,6 @@ document.addEventListener('DOMContentLoaded', function() {
             loader.style.display = 'inline-block';
             testCaseTabsContainer.innerHTML = ''; 
             testCaseTabContentContainer.innerHTML = '<p class="text-muted">{% blocktrans %}Executing...{% endblocktrans %}</p>'; 
-            if (initialTestCaseMsg) initialTestCaseMsg.style.display = 'none'; 
             
             try {
                 const userCode = codeEditor.getValue();
@@ -183,51 +248,29 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    const timerElement = document.getElementById('countdown-timer');
-    let remainingSeconds = parseInt(timerElement.dataset.seconds, 10);
-    const timerInterval = setInterval(updateTimer, 1000);
-    function updateTimer() { if (remainingSeconds <= 0) { clearInterval(timerInterval); timerElement.textContent = "00:00:00"; return; } remainingSeconds--; const hours = Math.floor(remainingSeconds / 3600).toString().padStart(2, '0'); const minutes = Math.floor((remainingSeconds % 3600) / 60).toString().padStart(2, '0'); const seconds = (remainingSeconds % 60).toString().padStart(2, '0'); timerElement.textContent = `${hours}:${minutes}:${seconds}`; }
-    updateTimer();
-    const saveUrl = `{% url 'save_evaluation_progress' uep_id=problem.id %}`;
-    const csrfToken = '{{ csrf_token }}';
-    let codeEditor = null;
-    let plainTextarea = document.querySelector('textarea.form-control');
-    const codeTextarea = document.getElementById('code-editor');
-    if (codeTextarea) { codeEditor = CodeMirror.fromTextArea(codeTextarea, { mode: 'python', lineNumbers: true, indentUnit: 4, matchBrackets: true }); codeEditor.setSize('100%', '28vh'); }
-    const saveProgress = async () => { let currentSolution = ''; if (codeEditor) { currentSolution = codeEditor.getValue(); } else if (plainTextarea) { currentSolution = plainTextarea.value; } try { await fetch(saveUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }, body: JSON.stringify({ solution: currentSolution }) }); } catch (error) { console.error('Failed to save progress:', error); } };
-    setInterval(saveProgress, 10000);
-    window.addEventListener('beforeunload', saveProgress);
-
     let isNavigatingInternally = false;
-
-    document.querySelectorAll('a.btn').forEach(link => {
-        link.addEventListener('click', () => {
-            isNavigatingInternally = true;
-        });
+    document.querySelectorAll('a.btn').forEach(link => { 
+        link.addEventListener('click', () => { 
+            isNavigatingInternally = true; 
+        }); 
     });
-
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden && !isNavigatingInternally) {
-            alert('Warning: Leaving the exam tab is not permitted and may be flagged for review.');
-            console.log('User switched tabs at ' + new Date().toLocaleTimeString());
-        }
+    document.addEventListener('visibilitychange', () => { 
+        if (document.hidden && !isNavigatingInternally) { 
+            alert('Warning: Leaving the exam tab is not permitted and may be flagged for review.'); 
+        } 
     });
-
     const pasteWarning = (event) => {
         event.preventDefault();
         alert('Warning: Pasting content is not permitted.');
     };
-
-    if (codeEditor) {
-        codeEditor.on('paste', (instance, event) => {
-            pasteWarning(event);
-        });
+    if (codeEditor) { 
+        codeEditor.on('paste', (instance, event) => { 
+            pasteWarning(event); 
+        }); 
     }
-
-    if (plainTextarea) {
-        plainTextarea.addEventListener('paste', pasteWarning);
+    if (plainTextarea) { 
+        plainTextarea.addEventListener('paste', pasteWarning); 
     }
-
 });
 </script>
 {% endblock %}

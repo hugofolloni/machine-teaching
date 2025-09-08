@@ -150,30 +150,31 @@
             </div>
         </div>
 
-        <div class="modal fade" id="configureTestCasesModal" tabindex="-1" aria-labelledby="configureTestCasesModalLabel" aria-hidden="true">
-          <div class="modal-dialog modal-lg modal-dialog-scrollable">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 class="modal-title" id="configureTestCasesModalLabel">Configure Test Cases</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-              </div>
-              <div class="modal-body">
-                <p>Select the test cases to be used, and define the visibility during the exam.</p>
-                <p><strong>Question:</strong> <span id="modal-tc-problem-title">Loading...</span></p>
-                <hr>
-                <div id="test-cases-form-container">
-                    <div class="d-flex justify-content-center">
-                        <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
-                    </div>
+    <div class="modal fade" id="configureTestCasesModal" tabindex="-1" aria-labelledby="configureTestCasesModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="configureTestCasesModalLabel">Configure Test Cases</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>Select the test cases to be used, define their visibility, and assign weights for grading.</p>
+            <p><strong>Question:</strong> <span id="modal-tc-problem-title">Loading...</span></p>
+            <hr>
+            <div id="test-cases-form-container">
+                <div class="d-flex justify-content-center">
+                    <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
                 </div>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="save-testcases-btn">Save Changes</button>
-              </div>
             </div>
           </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="save-testcases-btn">Save Changes</button>
+          </div>
         </div>
+      </div>
+    </div>
+
 {% endblock %}
 
 {% block javascript %}
@@ -262,22 +263,28 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="list-group-item">
                                 <div class="row align-items-center">
                                     <div class="col-1">
-                                        <input class="form-check-input use-tc-checkbox" type="checkbox" name="selected_tc" value="${tc.id}" id="use_tc_${tc.id}" ${isChecked}>
+                                        <input class="form-check-input use-tc-checkbox" type="checkbox" value="${tc.id}" id="use_tc_${tc.id}" ${isChecked}>
                                     </div>
-                                    <div class="col-8">
+                                    <div class="col-6">
                                         <pre class="mb-0"><code>${tc.content}</code></pre>
                                     </div>
-                                    <div class="col-3">
+                                    <div class="col-2">
                                         <div class="form-check form-switch">
-                                            <input class="form-check-input hidden-tc-checkbox" type="checkbox" name="hidden_tc" value="${tc.id}" id="hide_tc_${tc.id}" ${isHiddenChecked} ${isDisabled}>
-                                            <label class="form-check-label" for="hide_tc_${tc.id}">Oculto</label>
+                                            <input class="form-check-input hidden-tc-checkbox" type="checkbox" id="hide_tc_${tc.id}" ${isHiddenChecked} ${isDisabled}>
+                                            <label class="form-check-label" for="hide_tc_${tc.id}">Hidden</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-3">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">Weight</span>
+                                            <input class="form-control weight-tc-input" type="number" value="${parseFloat(tc.weight).toFixed(1)}" step="0.1" min="0" id="weight_tc_${tc.id}" ${isDisabled}>
                                         </div>
                                     </div>
                                 </div>
                             </div>`;
                     });
                 } else {
-                    formHtml = '<p>No test case founded.</p>';
+                    formHtml = '<p>No test cases found.</p>';
                 }
                 containerEl.innerHTML = formHtml;
                 saveBtn.disabled = false;
@@ -288,7 +295,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.querySelectorAll('#test-cases-form-container .use-tc-checkbox:checked').forEach(checkbox => {
                     const tcId = checkbox.value;
                     const isHidden = document.getElementById(`hide_tc_${tcId}`).checked;
-                    selectedTestCases.push({ id: tcId, hidden: isHidden });
+                    const weightValue = parseFloat(document.getElementById(`weight_tc_${tcId}`).value) || 1.0;
+                    selectedTestCases.push({ id: tcId, hidden: isHidden, weight: weightValue });
                 });
 
                 const csrfToken = document.querySelector('input[name=csrfmiddlewaretoken]').value;
@@ -303,7 +311,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.status === 'success') {
                         configureModal.hide();
                     } else {
-                        alert('Erro ao salvar: ' + (data.message || 'Erro desconhecido'));
+                        alert('Error saving: ' + (data.message || 'Unknown error'));
                     }
                 });
             };
@@ -312,6 +320,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (e.target.classList.contains('use-tc-checkbox')) {
                     const tcId = e.target.value;
                     document.getElementById(`hide_tc_${tcId}`).disabled = !e.target.checked;
+                    document.getElementById(`weight_tc_${tcId}`).disabled = !e.target.checked;
                 }
             });
         });

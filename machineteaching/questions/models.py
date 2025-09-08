@@ -414,6 +414,7 @@ class EvaluationProblemTestCase(models.Model):
     evaluation_problem = models.ForeignKey('EvaluationProblem', on_delete=models.CASCADE)
     test_case = models.ForeignKey('TestCase', on_delete=models.CASCADE)
     hidden = models.BooleanField(default=False)
+    weight = models.FloatField(default=1.0)
 
     class Meta:
         unique_together = ('evaluation_problem', 'test_case')
@@ -445,6 +446,7 @@ class UserEvaluation(models.Model):
     score = models.FloatField(default=0.0)
     submitted = models.BooleanField(default=False)
     user_class = models.ForeignKey(OnlineClass, on_delete=models.PROTECT, null=True)
+    needs_manual_grading = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = _('User Evaluation')
@@ -460,8 +462,11 @@ class UserEvaluationProblem(models.Model):
     outcome = models.CharField(max_length=2, choices=UserLog.OUTCOMES, default="S")
     seconds_in_question = models.IntegerField(default=0)
     test_case_hits = models.IntegerField(default=0)
-    grade = models.FloatField(default=0.0)
+    grade = models.FloatField(null=True, blank=True)
     feedback = models.TextField(blank=True, null=True)
+    autograder_results = models.JSONField(null=True, blank=True)
+    show_test_cases_in_feedback = models.BooleanField(default=False)
+
 
     class Meta:
         verbose_name = _('User Evaluation Problem')

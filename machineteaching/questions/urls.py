@@ -98,6 +98,7 @@ urlpatterns = [
     path('evaluation/<int:evaluation_id>/release_grades/', views.release_grades, name='release_grades'),
     path('user_evaluation/<int:ue_id>/grade/', views.grade_student_submission, name='grade_student_submission'),
     path('user_evaluation_problem/<int:uep_id>/grade/', views.grade_evaluation_problem, name='grade_evaluation_problem'),
+    path('evaluation/<int:evaluation_id>/export_grades/', views.export_grades_csv, name='export_grades_csv'),
 ]
 
 if settings.DEBUG:

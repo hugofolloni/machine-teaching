@@ -228,6 +228,16 @@ class EvaluationProblemForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-select'}),
         label='Tipo da Questão'
     )
+    solution_header = forms.CharField(
+        label='Header',
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome da Função'})
+    )
+    solution_content = forms.CharField(
+        label='Código da Solução',
+        required=True,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 10})
+    )
 
     class Meta:
         model = Problem
@@ -236,13 +246,13 @@ class EvaluationProblemForm(forms.ModelForm):
             'question_type': forms.Select(attrs={'class': 'form-select'}),
             'title': forms.TextInput(attrs={'class': 'form-control'}),
             'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
-            'test_case_generator': forms.Textarea(attrs={'class': 'form-control', 'rows': 10, 'placeholder': 'def generate():\n    # Seu código aqui\n    return [ (entrada, saida), ... ]'}),
+            'test_case_generator': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'locked_problem': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
         labels = {
             'title': 'Título da Questão',
             'content': 'Enunciado',
-            'test_case_generator': 'Gerador de Casos de Teste (para questões de código)',
+            'test_case_generator': 'Gerador de Casos de Teste',
             'locked_problem': 'Questão privada (não pode ser usada em outras provas/listas)',
         }
 
@@ -263,6 +273,21 @@ class EvaluationProblemForm(forms.ModelForm):
             except Exception as e:
                 raise forms.ValidationError(f"Erro ao compilar o gerador de casos de teste: {e}")
         return test_case_generator
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        question_type = cleaned_data.get('question_type')
+        solution_header = cleaned_data.get('solution_header')
+        solution_content = cleaned_data.get('solution_content')
+
+        if question_type == 'C':
+            if not solution_header:
+                self.add_error('solution_header', 'Este campo é obrigatório para questões de código.')
+            if not solution_content:
+                self.add_error('solution_content', 'Este campo é obrigatório para questões de código.')
+        
+        return cleaned_data
+
     
 class GradeSubmissionForm(forms.ModelForm):
     show_test_cases_in_feedback = forms.BooleanField(

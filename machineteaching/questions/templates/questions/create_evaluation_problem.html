@@ -45,6 +45,7 @@
         pointer-events: none; 
     }
     .test-case-container {
+        height: 30vh;
         transition: opacity 0.3s ease;
     }
 
@@ -88,20 +89,24 @@
 
             <div style="display: flex; flex-direction: column; gap: 2rem;">
                 
-                <div class="card shadow-sm" style="flex: 1;">
-                    <div class="card-body">
-                        <div class="fake-code-editor">
-                            <!-- <span>(Área de solução)</span> -->
+                <div class="card shadow-sm solution-main-container" id="solution-main-container">
+                    <div class="card-body d-flex flex-column">
+                        <div class="mb-3">
+                            <label class="form-label solution-header-label">{{ form.solution_header.label }}</label>
+                            {{ form.solution_header }}
+                        </div>
+                        <div class="mb-3 flex-grow-1 d-flex flex-column">
+                            <label id='solution-label' class="form-label solution-header-label">{{ form.solution_content.label }}</label>
+                            {{ form.solution_content }}
                         </div>
                     </div>
                 </div>
 
                 <div class="card shadow-sm test-case-container" id="test-case-container" style="flex: 1;">
-                     <div class="card-body">
-                        <label class="form-label">Test Case Generator</label>
+                     <div class="card-body d-flex flex-column">
+                        <label id='test-case-label' class="form-label solution-header-label">{{ form.test_case_generator.label }}</label>
                         {{ form.test_case_generator }}
                     </div>
-                </div>
             </div>
 
         </div>
@@ -110,36 +115,70 @@
 {% endblock %}
 
 {% block javascript %}
+{# Scripts do CodeMirror #}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/dialog/dialog.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/search/searchcursor.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/search/search.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Adiciona classes do bootstrap
-    document.querySelectorAll('input[type="text"], textarea, select').forEach(el => {
-        if (!el.classList.contains('form-check-input')) {
-            el.classList.add('form-control');
-        }
+    const solutionEditor = CodeMirror.fromTextArea(document.getElementById('{{ form.solution_content.id_for_label }}'), {
+        lineNumbers: true,
+        mode: "python",
+        indentUnit: 4,
+        value: "Write your code here..."
     });
+    const testCaseEditor = CodeMirror.fromTextArea(document.getElementById('{{ form.test_case_generator.id_for_label }}'), {
+        lineNumbers: true,
+        mode: "python",
+        indentUnit: 4,
+        value: "def generate():\n    # Your code here\n    return ( (input, output ), ... )",
+    });
+    solutionEditor.setSize('100%', 240);
+    testCaseEditor.setSize('100%', 150);
+
+    document.getElementById('solution-label').addEventListener('click', function() {
+        solutionEditor.focus();
+    });
+
+    document.getElementById('test-case-label').addEventListener('click', function() {
+        testCaseEditor.focus();
+    });
+
 
     const questionTypeSelect = document.getElementById('{{ form.question_type.id_for_label }}');
     const testCaseContainer = document.getElementById('test-case-container');
-    const testCaseTextarea = document.getElementById('{{ form.test_case_generator.id_for_label }}');
+    const solutionContainer = document.getElementById('solution-main-container');
+    const solutionHeaderInput = document.getElementById('{{ form.solution_header.id_for_label }}');
 
-    function toggleTestCaseInteractivity() {
+    function toggleCodeFieldsInteractivity() {
         const isCodeQuestion = questionTypeSelect.value === 'C';
+        const wasDisabled = solutionContainer.classList.contains('disabled');
 
-        if (isCodeQuestion) {
-            testCaseContainer.classList.remove('disabled');
-            testCaseTextarea.readOnly = false;
-        } else {
-            testCaseContainer.classList.add('disabled');
-            testCaseTextarea.readOnly = true;
+        testCaseContainer.classList.toggle('disabled', !isCodeQuestion);
+        solutionContainer.classList.toggle('disabled', !isCodeQuestion);
+        
+        solutionEditor.setOption("readOnly", !isCodeQuestion);
+        testCaseEditor.setOption("readOnly", !isCodeQuestion);
+        solutionHeaderInput.readOnly = !isCodeQuestion;
+
+        if (wasDisabled && isCodeQuestion) {
+            setTimeout(function() {
+                solutionEditor.refresh();
+                testCaseEditor.refresh();
+            }, 10);
         }
     }
 
-    // Executa na carga da página
-    toggleTestCaseInteractivity();
-
-    // Adiciona o listener para mudanças
-    questionTypeSelect.addEventListener('change', toggleTestCaseInteractivity);
+    toggleCodeFieldsInteractivity();
+    questionTypeSelect.addEventListener('change', toggleCodeFieldsInteractivity);
+    
+    setTimeout(function() {
+        solutionEditor.refresh();
+        testCaseEditor.refresh();
+    }, 10);
 });
 </script>
 {% endblock %}

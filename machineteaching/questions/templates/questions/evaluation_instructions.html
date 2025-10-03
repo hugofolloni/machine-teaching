@@ -19,8 +19,9 @@
             <div class="alert alert-secondary text-start" role="alert">
                 <h4 class="alert-heading">{% blocktrans %}Important Rules{% endblocktrans %}</h4>
                 <ul class="list-unstyled">
-                    <li><i class="bi bi-stopwatch me-2"></i><strong>{% blocktrans %}Timed Session:{% endblocktrans %}</strong> {% blocktrans %}Once you begin, a timer for <strong>{{ evaluation.end_date|timeuntil:evaluation.start_date }}</strong> will start. It cannot be paused.{% endblocktrans %}</li>
+                    <li class="mt-2"><i class="bi bi-stopwatch me-2"></i><strong>{% blocktrans %}Timed Session:{% endblocktrans %}</strong> {% blocktrans %}Once you begin, a timer for <strong>{{ evaluation.end_date|timeuntil:evaluation.start_date }}</strong> will start. It cannot be paused.{% endblocktrans %}</li>
                     <li class="mt-2"><i class="bi bi-file-code me-2"></i><strong>{% blocktrans %}Attempts vs. Submission:{% endblocktrans %}</strong> {% blocktrans %}For coding questions, you can 'Run' your code multiple times to check it against public test cases. This is an 'attempt'. You only have <strong>one final 'Submission'</strong> for grading.{% endblocktrans %}</li>
+                    <li class="mt-2"><i class="bi bi-shield-check me-2"></i><strong>{% blocktrans %}Public vs. Private Test Cases:{% endblocktrans %}</strong> {% blocktrans %}The 'Run' button checks your code against visible, public test cases to help you debug. Your final submission, however, will be graded against a more extensive set of hidden, private test cases. Passing all public tests does not guarantee a full score.{% endblocktrans %}</li>
                     <li class="mt-2"><i class="bi bi-box-arrow-right me-2"></i><strong>{% blocktrans %}Final Submission:{% endblocktrans %}</strong> {% blocktrans %}Your work is saved as you go, but you must click 'Submit Exam' at the end. If the timer runs out, your latest saved answers will be submitted automatically.{% endblocktrans %}</li>
                 </ul>
             </div>

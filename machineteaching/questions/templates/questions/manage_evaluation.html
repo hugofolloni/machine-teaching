@@ -39,7 +39,7 @@
                     <div class="input-group">
                         <input type="text" name="q" class="form-control" placeholder="Search question..." value="{{ search_query }}">
                         <button class="btn btn-outline-secondary" type="submit">Search</button>
-                        <a href="{% url 'create_evaluation_problem' evaluation_id=evaluation.id %}" class="btn btn-primary px-2" onmouseover="this.style.border='1px solid black';"  onmouseout="this.style.border='1px solid #0d6efd';" title="Criar Nova Questão"><i class="bi bi-plus-lg"></i></a>
+                        <a id='create_question' href="{% url 'create_evaluation_problem' evaluation_id=evaluation.id %}" class="btn btn-primary px-2" onmouseover="this.style.border='1px solid black';"  onmouseout="this.style.border='1px solid #0d6efd';" title="Criar Nova Questão"><i class="bi bi-plus-lg"></i></a>
                     </div>
                 </form>
 
@@ -263,10 +263,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="list-group-item">
                                 <div class="row align-items-center">
                                     <div class="col-1">
-                                        <input class="form-check-input use-tc-checkbox" type="checkbox" value="${tc.id}" id="use_tc_${tc.id}" ${isChecked}>
+                                        <input class="form-check-input use-tc-checkbox" type="checkbox"  value="${tc.id}" id="use_tc_${tc.id}" ${isChecked}>
                                     </div>
                                     <div class="col-6">
-                                        <pre class="mb-0"><code>${tc.content}</code></pre>
+                                        <pre class="mb-0" style="overflow-y: hidden;"><code>${tc.content}</code></pre>
                                     </div>
                                     <div class="col-2">
                                         <div class="form-check form-switch">

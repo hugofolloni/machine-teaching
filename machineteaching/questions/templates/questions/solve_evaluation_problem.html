@@ -201,6 +201,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderResults(resultsList) {
         testCaseTabsContainer.innerHTML = '';
         testCaseTabContentContainer.innerHTML = '';
+        console.log(resultsList);
 
         if (!resultsList || !Array.isArray(resultsList) || resultsList.length === 0) {
             testCaseTabContentContainer.innerHTML = `<div class="alert alert-warning">No results were returned.</div>`;

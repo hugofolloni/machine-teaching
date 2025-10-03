@@ -1405,21 +1405,29 @@ def create_evaluation_problem(request, evaluation_id):
         if form.is_valid():
             with transaction.atomic():
                 cleaned_data = form.cleaned_data
+                question_type = cleaned_data.get('question_type')
 
                 problem = Problem.objects.create(
                     title=cleaned_data.get('title'),
                     content=cleaned_data.get('content'),
-                    question_type=cleaned_data.get('question_type'), 
-                    test_case_generator=cleaned_data.get('test_case_generator'),
+                    question_type=question_type, 
+                    test_case_generator=cleaned_data.get('test_case_generator', ''),
                     locked_problem=cleaned_data.get('locked_problem', False),
                     evaluation_problem=True 
                 )
 
-                Solution.objects.create(
-                    problem=problem,
-                    header=f"# Solução para a questão '{problem.title}'",
-                    content="# N/A"
-                )
+                if question_type == 'C':
+                    Solution.objects.create(
+                        problem=problem,
+                        header=cleaned_data.get('solution_header'),
+                        content=cleaned_data.get('solution_content')
+                    )
+                else:
+                    Solution.objects.create(
+                        problem=problem,
+                        header=f"# Solução para a questão '{problem.title}'",
+                        content="# N/A"
+                    )
                 
                 EvaluationProblem.objects.create(
                     evaluation=evaluation,

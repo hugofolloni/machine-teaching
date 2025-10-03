@@ -5,10 +5,13 @@ from django.conf import settings
 from django.contrib.auth.models import User, Group
 from .models import (Chapter, Problem, ExerciseSet, OnlineClass, UserLog,
                      #UserLogError, UserProfile, 
-                     Professor, OnlineClass, Language)
+                     Professor, OnlineClass, Language, 
+                     Evaluation, EvaluationProblem, UserEvaluation, UserEvaluationProblem)
 from django.test.utils import override_settings
 from django.test import TestCase#, TransactionTestCase
 #from django.db import transaction
+from datetime import datetime, timedelta
+from django.utils import timezone
 
 global USER_CLASS
 
@@ -40,8 +43,10 @@ class InterfaceTests(DjkSampleTestCase):
     def change_language(self, page):
         page.goto(f"{self.live_server_url}/pt-br")
         page.click('.change-language')
+        page.wait_for_selector('.landing h1:has-text("Welcome to  Machine Teaching")')
         self.assertEqual('Welcome to  Machine Teaching', page.locator('.landing h1').text_content())
         page.click('.change-language')
+        page.wait_for_selector('.landing h1:has-text("Bem-vindo ao Machine Teaching")') 
         self.assertEqual('Bem-vindo ao Machine Teaching',page.locator('.landing h1').text_content())
 
     def read_terms(self, page):
@@ -97,20 +102,21 @@ class InterfaceTests(DjkSampleTestCase):
         page.goto(f"{self.live_server_url}/pt-br/chapters")
         self.assertEqual("Aulas", page.locator('.content .topbar-left .title').text_content())
 
-    def specific_chapter(self, page):
-        page.goto(f"{self.live_server_url}/pt-br/chapters/1")
+    def specific_chapter(self, page, id_to_find):
+        page.goto(f"{self.live_server_url}/pt-br/chapters/{id_to_find}")
         self.assertEqual("Problemas", page.locator('.layout-content .col.col-7 .card.chapter-list h3').text_content())
     
-    def specific_problem(self, page):
-        page.goto(f"{self.live_server_url}/pt-br/chapters/1")
+    def specific_problem(self, page, id_to_find):
+        page.goto(f"{self.live_server_url}/pt-br/chapters/{id_to_find}")
         self.assertEqual("Progresso", page.locator('text=Progresso').text_content())
     
-    def specific_problem_2(self, page):
-        page.goto(f"{self.live_server_url}/pt-br/chapters/1")
+    def specific_problem_2(self, page, id_to_find):
+        page.goto(f"{self.live_server_url}/pt-br/chapters/{id_to_find}")
         self.assertEqual("Data de entrega", page.locator('text=Entrega').text_content())
 
     def past_solutions(self, page):
-        page.goto(f"{self.live_server_url}/pt-br/problem_solutions/1")
+        id_to_find = Problem.objects.first().id
+        page.goto(f"{self.live_server_url}/pt-br/problem_solutions/{id_to_find}")
         self.assertEqual("Problema atual", page.locator('text=Problema atual').text_content())
 
     def create_professor(self, page):
@@ -124,15 +130,10 @@ class InterfaceTests(DjkSampleTestCase):
         page.click('text=Escolher todos')
         page.click('text=Salvar')
         Professor.objects.create(user=User.objects.get(username=settings.TEST_MANAGER))
-  
-    def assign_exercise(self, page):
-        page.goto(f"{self.live_server_url}/pt-br/classes/manage/2")
-        page.fill('input[type="date"]', '2022-12-12')
-        page.fill('input[name="time"]', '23:59')
-        page.click('text=Adicionar')     
 
     def exercise(self, page):
-        page.goto(f"{self.live_server_url}/pt-br/1")
+        id_to_find = Problem.objects.first().id
+        page.goto(f"{self.live_server_url}/pt-br/{id_to_find}")
         self.assertEqual("Exercicio_Teste", page.locator('text=Exercicio_Teste Pular >> h3').text_content())
         self.write_code(page)
         self.assertEqual("Casos de teste", page.locator('text=Casos de teste').text_content())
@@ -162,14 +163,14 @@ class InterfaceTests(DjkSampleTestCase):
         page.click("text=Enviar")
         self.assertEqual("Enviamos por e-mail instruções para redefinir sua senha, se existir uma conta com o e-mail que você digitou. Você deve recebê-las em breve.", page.locator('text=Enviamos por e-mail instruções para redefinir sua senha, se existir uma conta com o e-mail que você digitou. Você deve recebê-las em breve.').text_content().strip())
 
-    def class_dashboard(self, page):  
-        page.goto(f"{self.live_server_url}/pt-br/classes/dashboard/2")
+    def class_dashboard(self, page, id_to_find):  
+        page.goto(f"{self.live_server_url}/pt-br/classes/dashboard/{id_to_find}")
         self.assertEqual("Progresso da turma", page.locator('text=Progresso da turma').text_content())
 
     def logout(self, page):
         page.get_by_text("Olá, Usuário Teste").hover()
         page.click("text=Sair")
-        self.assertEqual("Welcome to  Machine Teaching", page.locator('text=Welcome to  Machine Teaching').text_content())
+        self.assertEqual("Bem-vindo ao Machine Teaching", page.locator('text=Bem-vindo ao Machine Teaching').text_content())
 
     def create_class(self, page):
         page.goto(f"{self.live_server_url}/pt-br/classes")
@@ -201,17 +202,129 @@ class InterfaceTests(DjkSampleTestCase):
         page.fill('form[action="/pt-br/new"] input[name="order"]', '1')
         page.click("text=Adicionar problema")
 
+    def professor_creates_exam(self, page, id_to_find):
+        page.goto(f"{self.live_server_url}/pt-br/classes/manage/{id_to_find}")
+        page.click(f"a[href='/pt-br/classes/manage/{id_to_find}/evaluations/new/']")
+        
+        exam_title = 'Prova Final de Teste'
+        page.fill('input[name="title"]', exam_title)
+        now = timezone.now()
+        start_time = now - timedelta(hours=3)
+        end_time = now - timedelta(hours=3) + timedelta(minutes=2)
+        page.fill('input[name="start_date"]', start_time.strftime('%Y-%m-%dT%H:%M'))
+        page.fill('input[name="end_date"]', end_time.strftime('%Y-%m-%dT%H:%M'))
+        page.click('button[type="submit"]:has-text("Create")')
+        
+        page.wait_for_selector(f'h3:has-text("{exam_title}")')
+        self.assertEqual(exam_title, page.locator('h3').first.text_content())
 
-    # def user(self):
+    def professor_creates_question_in_exam(self, page):
+        page.click('a#create_question')
+        page.fill('input#id_title', 'Soma')
+        page.fill('textarea#id_content', 'Escreva uma função que some dois números.')
+        page.click('input#id_locked_problem')
+        page.click('input#id_solution_header')
+        page.fill('input#id_solution_header', 'soma')
+        page.click('label#solution-label')
+        page.keyboard.type('def soma(a, b):')
+        page.keyboard.press("Enter")
+        page.keyboard.type("    return a + b")
+        page.click('label#test-case-label')
+        page.keyboard.type("def generate():")
+        page.keyboard.press("Enter")
+        page.keyboard.type("    return [( 1, 2 )]")
+        page.click('button:has-text("Create Question")')        
+        page.wait_for_selector(f'.question-item h6:has-text("Soma")')
+        self.assertEqual(1, page.locator('.question-item').count())
+        page.click('button:has-text("Configure Test Cases")')
+        checkbox = page.locator('input.use-tc-checkbox')
+        if not checkbox.is_checked():
+            checkbox.check()
+        page.click('button:has-text("Save Changes")')
+
+    def professor_adds_question_to_exam(self, page):
+        page.fill('input[name="q"]', 'Exercicio_Teste')
+        page.click('button:has-text("Search")')
+        page.wait_for_selector(f'li:has-text("Exercicio_Teste")')
+        page.click(f'li:has-text("Exercicio_Teste") button:has-text("Add")')
+
+        page.wait_for_selector(f'.question-item h6:has-text("Exercicio_Teste")')
+        self.assertEqual(2, page.locator('.question-item').count())
+        page.click('button:has-text("Confirm")')
+        self.assertEqual("Exams", page.locator('text=Exams').text_content())
+
+    def student_starts_exam(self, page):
+        page.wait_for_selector('.modal-dialog', state='visible')
+        page.click('a:has-text("Go to Exam")')
+        
+        page.wait_for_selector('h2:has-text("Prova Final de Teste")')
+        page.click('button:has-text("I understand, Start Exam")')
+        
+        page.wait_for_selector('h3:has-text("Prova Final de Teste")')
+        self.assertTrue(page.locator("#countdown-timer").is_visible())
+
+    def student_solves_coding_problem(self, page):
+        page.click('a:has-text("Go to Question")')
+        
+        page.wait_for_selector(f'h4:has-text("Soma")')
+        page.locator('.CodeMirror').click()
+        page.keyboard.type("def soma(a,b):")
+        page.keyboard.press("Enter")
+        page.keyboard.type("    return a + b")
+        page.click('button#run-code-btn')
+        
+        page.wait_for_selector('.badge.bg-success')
+        self.assertEqual('P', page.locator('.badge.bg-success').text_content())
+
+    def student_submits_exam(self, page):
+        page.click('a:has-text("Back to Question List")')
+        page.wait_for_selector('button#open-submit-modal-btn')
+        page.click('button#open-submit-modal-btn')
+        page.locator('input#confirm-unanswered-check').check()
+        page.click('button#final-submit-btn')
+        
+        page.wait_for_selector('h2.text-success')
+        self.assertEqual('Exam Submitted Successfully!', page.locator('h2.text-success').text_content())
+
+    def professor_runs_autograder(self, page, class_id):
+        id_to_find = Evaluation.objects.first().id
+        Evaluation.objects.filter(id = id_to_find).update(start_date=timezone.now() - timedelta(hours=1), end_date=timezone.now() - timedelta(minutes=59)) # Troca a data da prova para o professor poder ver o dashboard
+        page.goto(f"{self.live_server_url}/pt-br/evaluations/manage/{id_to_find}/")
+        page.click('a:has-text("Grading Dashboard")')
+        page.on("dialog", lambda dialog: dialog.accept())
+        page.click('button:has-text("Run Auto-Grader")')
+        page.wait_for_selector('button:has-text("Auto-Grader Run")')
+        
+
+    def professor_manually_grades(self, page,):
+        page.click('a:has-text("Grade Submission")')
+        page.wait_for_selector('h3:has-text("Usuário Teste")')
+        page.click('a:has-text("Grade Question")')
+        
+        page.wait_for_selector(f'h4:has-text("Soma")')
+        page.fill('input[type=range]', '0.75')
+        page.fill('textarea[name="feedback"]', 'Bom trabalho!')
+        page.click('button:has-text("Save")')
+
+    def professor_releases_grades(self, page):
+        page.wait_for_selector('h3:has-text("Usuário Teste")')
+        page.click('a:has-text("Back to Dashboard")')
+        page.wait_for_selector('h2:has-text("Prova Final de Teste")')
+        page.click('button:has-text("Release Grades")')
+        
+        page.wait_for_selector('button:disabled:has-text("Grades Released")')
+        self.assertTrue(page.locator('button:disabled:has-text("Grades Released")').is_visible())
+
+
     def test_user(self):
         page = self.browser.new_page()
         page.set_default_timeout(10000)
 
+        print("\n      - Testando mudança de linguagem...")
+        self.change_language(page)
+
         print("      - Testando sobre...")
         self.about(page)
-
-        print("      - Testando mudança de linguagem...")
-        self.change_language(page)
 
         print("      - Testando termos de uso...")
         self.read_terms(page)
@@ -227,6 +340,7 @@ class InterfaceTests(DjkSampleTestCase):
         self.create_professor(page)
         self.login(page, settings.TEST_MANAGER, settings.TEST_PASSWORD)
         class_code = self.create_class(page)
+        class_id = OnlineClass.objects.get(class_code=class_code).id
         self.create_chapter(page)
         self.logout(page)
 
@@ -250,14 +364,12 @@ class InterfaceTests(DjkSampleTestCase):
         self.chapters(page)
 
         print("      - Testando vista de capítulo específico...")
-        self.specific_chapter(page)
+        chapter_id = Chapter.objects.first().id
+        self.specific_chapter(page, chapter_id)
 
         print("      - Testando vista de exercício específico...")
-        self.specific_problem(page)
-        self.specific_problem_2(page)
-
-        print("      - Testando vista de próximo exercício...")
-        self.next(page)
+        self.specific_problem(page, chapter_id)
+        self.specific_problem_2(page, chapter_id)
 
         print("      - Testando vista de soluções passadas...")
         self.past_solutions(page)
@@ -266,118 +378,200 @@ class InterfaceTests(DjkSampleTestCase):
         self.password_reset(page)
 
         self.login(page, settings.TEST_MANAGER, settings.TEST_PASSWORD)
-        self.class_dashboard(page)
+        self.class_dashboard(page, class_id)
+
+        print("      - Testando professor criando exame...")
+        self.professor_creates_exam(page, class_id)
+        
+        print("      - Testando professor adicionar questão ao exame...")
+        self.professor_creates_question_in_exam(page)
+        self.professor_adds_question_to_exam(page)
+        self.logout(page)
+
+        print("      - Testando aluno entrando no exame...")
+        self.login(page, settings.TEST_USER, settings.TEST_PASSWORD)        
+        self.student_starts_exam(page)
+        
+        print("      - Testando aluno resolvendo questão no exame...")
+        self.student_solves_coding_problem(page)
+        self.student_submits_exam(page)
+        self.logout(page)
+
+        print("      - Testando professor usando auto-grader...")
+        self.login(page, settings.TEST_MANAGER, settings.TEST_PASSWORD)
+        self.professor_runs_autograder(page, class_id)
+        
+        print("      - Testando professor corrigindo manualmente...")
+        self.professor_manually_grades(page)
+        
+        print("      - (Professor) Liberando as notas...")
+        self.professor_releases_grades(page)
 
         page.close()
 
-# class BackendTests(TestCase):
+class BackendTests(TestCase):
 
-#     @classmethod
-#     def setUpClass(cls):
-#         super().setUpClass()
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
 
-#     @classmethod
-#     def tearDownClass(cls):
-#         super().tearDownClass()
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
 
-#     def test_create_professor(self):
-#         Group.objects.get_or_create(name='Professor')
+    def test_create_professor(self):
+        Group.objects.get_or_create(name='Professor')
 
-#         professor_user = User.objects.create(
-#             username=settings.TEST_MANAGER,
-#             email=settings.TEST_MANAGER,
-#             password=settings.TEST_PASSWORD
-#         )
+        professor_user = User.objects.create(
+            username=settings.TEST_MANAGER,
+            email=settings.TEST_MANAGER,
+            password=settings.TEST_PASSWORD
+        )
 
-#         professor = Professor.objects.create(user=professor_user)
+        professor = Professor.objects.create(user=professor_user)
 
-#         self.assertEqual(professor.user.username, settings.TEST_MANAGER)
+        self.assertEqual(professor.user.username, settings.TEST_MANAGER)
         
-#     def test_create_user(self):
-#         user = User.objects.create(
-#             username=settings.TEST_USER,
-#             email=settings.TEST_USER,
-#             password=settings.TEST_PASSWORD
-#         )
+    def test_create_user(self):
+        user = User.objects.create(
+            username=settings.TEST_USER,
+            email=settings.TEST_USER,
+            password=settings.TEST_PASSWORD
+        )
 
-#         self.assertEqual(user.username, settings.TEST_USER)
+        self.assertEqual(user.username, settings.TEST_USER)
 
-#     def test_chapter_creation(self):
-#         chapter = Chapter.objects.create(label='Chapter 1')
-#         self.assertEqual(chapter.label, 'Chapter 1')
+    def test_chapter_creation(self):
+        chapter = Chapter.objects.create(label='Chapter 1')
+        self.assertEqual(chapter.label, 'Chapter 1')
 
-#     def test_problem_creation(self):
-#         problem = Problem.objects.create(
-#             question_type='C',
-#             title='Test Problem',
-#             content='Solve this problem',
-#             options='',
-#             difficulty='easy',
-#             hint='Think about loops'
-#         )
-#         self.assertEqual(problem.title, 'Test Problem')
+    def test_problem_creation(self):
+        problem = Problem.objects.create(
+            question_type='C',
+            title='Test Problem',
+            content='Solve this problem',
+            options='',
+            difficulty='easy',
+            hint='Think about loops'
+        )
+        self.assertEqual(problem.title, 'Test Problem')
 
-#     def test_exercise_set_creation(self):
-#         chapter = Chapter.objects.create(label='Chapter 1')
-#         problem = Problem.objects.create(
-#             question_type='C',
-#             title='Test',
-#             content='Testing'
-#         )
-#         exercise_set = ExerciseSet.objects.create(
-#             chapter=chapter,
-#             problem=problem,
-#             order=1
-#         )
+    def test_exercise_set_creation(self):
+        chapter = Chapter.objects.create(label='Chapter 1')
+        problem = Problem.objects.create(
+            question_type='C',
+            title='Test',
+            content='Testing'
+        )
+        exercise_set = ExerciseSet.objects.create(
+            chapter=chapter,
+            problem=problem,
+            order=1
+        )
 
-#         self.assertEqual(exercise_set.chapter.label, 'Chapter 1')
-#         self.assertEqual(exercise_set.problem.title, 'Test')
+        self.assertEqual(exercise_set.chapter.label, 'Chapter 1')
+        self.assertEqual(exercise_set.problem.title, 'Test')
 
-#     def test_online_class_creation(self):
-#         online_class = OnlineClass.objects.create(
-#             name='Test Class',
-#             class_code='ABC123',
-#             active=True,
-#             start_date='2023-01-01'
-#         )
+    def test_online_class_creation(self):
+        online_class = OnlineClass.objects.create(
+            name='Test Class',
+            class_code='ABC123',
+            active=True,
+            start_date='2023-01-01'
+        )
 
-#         self.assertEqual(online_class.name, 'Test Class')
-#         self.assertTrue(online_class.active)
+        self.assertEqual(online_class.name, 'Test Class')
+        self.assertTrue(online_class.active)
 
-#     def test_user_solves_problem(self):
-#         user = User.objects.create(
-#             username=settings.TEST_USER,
-#             email=settings.TEST_USER,
-#             password=settings.TEST_PASSWORD
-#         )
+    def test_user_solves_problem(self):
+        user = User.objects.create(
+            username=settings.TEST_USER,
+            email=settings.TEST_USER,
+            password=settings.TEST_PASSWORD
+        )
         
-#         problem = Problem.objects.create(
-#             question_type='C',
-#             title='Test',
-#             content='Testing'
-#         )
+        problem = Problem.objects.create(
+            question_type='C',
+            title='Test',
+            content='Testing'
+        )
 
-#         online_class = OnlineClass.objects.create(
-#             name='Test',
-#             class_code='ZZZ-ZZZ-ZZZZ',
-#             active=True,
-#             start_date='2024-01-01'
-#         )
+        online_class = OnlineClass.objects.create(
+            name='Test',
+            class_code='ZZZ-ZZZ-ZZZZ',
+            active=True,
+            start_date='2024-01-01'
+        )
 
-#         UserLog.objects.create(
-#             user=user,
-#             problem=problem,
-#             solution='print("Hello, world!")',
-#             outcome='P',
-#             seconds_in_code=60,
-#             seconds_in_page=120,
-#             seconds_to_begin=10,
-#             solution_lines=1,
-#             user_class=online_class
-#         )
+        UserLog.objects.create(
+            user=user,
+            problem=problem,
+            solution='print("Hello, world!")',
+            outcome='P',
+            seconds_in_code=60,
+            seconds_in_page=120,
+            seconds_to_begin=10,
+            solution_lines=1,
+            user_class=online_class
+        )
 
-#         self.assertEqual(UserLog.objects.count(), 1)
-#         log = UserLog.objects.first()
-#         self.assertEqual(log.user, user)
-#         self.assertEqual(log.problem, problem)
-#         self.assertEqual(log.outcome, 'P')
+        self.assertEqual(UserLog.objects.count(), 1)
+        log = UserLog.objects.first()
+        self.assertEqual(log.user, user)
+        self.assertEqual(log.problem, problem)
+        self.assertEqual(log.outcome, 'P')
+
+    def test_evaluation_creation(self):
+        online_class = OnlineClass.objects.create(name='Test Class', start_date=datetime.now().date())
+        evaluation = Evaluation.objects.create(
+            title='Final Exam',
+            online_class=online_class,
+            start_date=timezone.now(),
+            end_date=timezone.now() + timedelta(hours=2)
+        )
+        self.assertEqual(Evaluation.objects.count(), 1)
+        self.assertEqual(evaluation.title, 'Final Exam')
+        self.assertEqual(evaluation.online_class, online_class)
+
+    def test_evaluation_problem_creation(self):
+        online_class = OnlineClass.objects.create(name='Test Class', start_date=datetime.now().date())
+        evaluation = Evaluation.objects.create(title='Midterm', online_class=online_class, start_date=timezone.now(), end_date=timezone.now())
+        problem = Problem.objects.create(title='Test Problem', content='Content')
+        eval_problem = EvaluationProblem.objects.create(
+            evaluation=evaluation,
+            problem=problem,
+            order=1,
+            weight=2.5
+        )
+        self.assertEqual(eval_problem.evaluation, evaluation)
+        self.assertEqual(eval_problem.problem, problem)
+        self.assertEqual(eval_problem.weight, 2.5)
+
+    def test_user_evaluation_session_creation(self):
+        user = User.objects.create_user(username='testuser', password='password')
+        online_class = OnlineClass.objects.create(name='Test Class', start_date=datetime.now().date())
+        evaluation = Evaluation.objects.create(title='Quiz 1', online_class=online_class, start_date=timezone.now(), end_date=timezone.now())
+        user_eval = UserEvaluation.objects.create(
+            user=user,
+            evaluation=evaluation
+        )
+        self.assertEqual(user_eval.user, user)
+        self.assertEqual(user_eval.evaluation, evaluation)
+        self.assertFalse(user_eval.submitted)
+        self.assertEqual(user_eval.score, 0.0)
+
+    def test_user_evaluation_problem_creation(self):
+        user = User.objects.create_user(username='testuser', password='password')
+        online_class = OnlineClass.objects.create(name='Test Class', start_date=datetime.now().date())
+        evaluation = Evaluation.objects.create(title='Quiz 1', online_class=online_class, start_date=timezone.now(), end_date=timezone.now())
+        problem = Problem.objects.create(title='Test Problem', content='Content')
+        user_eval = UserEvaluation.objects.create(user=user, evaluation=evaluation)
+        eval_problem = EvaluationProblem.objects.create(evaluation=evaluation, problem=problem, order=1)
+        
+        user_eval_problem = UserEvaluationProblem.objects.create(
+            user_evaluation=user_eval,
+            evaluation_problem=eval_problem
+        )
+        self.assertEqual(user_eval_problem.user_evaluation, user_eval)
+        self.assertEqual(user_eval_problem.solution, "")
+        self.assertIsNone(user_eval_problem.grade)

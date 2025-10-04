@@ -40,8 +40,8 @@
                 <hr class="my-4">
 
                 <div class="d-flex justify-content-end gap-2">
-                    <a href="{% url 'manage_class' online_class.id %}" class="btn btn-secondary">Cancel</a>
-                    <button type="submit" class="btn btn-primary">Create</button>
+                    <a href="{% url 'manage_class' online_class.id %}" class="btn btn-secondary">{% trans "Cancel" %}</a>
+                    <button type="submit" class="btn btn-primary">{% trans "Create" %}</button>
                 </div>
             </form>
         </div>

@@ -61,23 +61,23 @@
                     <h5>{% trans "Problem Content" %}</h5>
                     
                     <div class="mb-3">
-                        <label class="form-label">Problem Title</label>
+                        <label class="form-label">{% trans "Problem Title" %}</label>
                         {{ form.title }}
                     </div>
                     
                     <div class="mb-3" style="flex-grow: 1; display: flex; flex-direction: column;">
-                        <label class="form-label">Content</label>
+                        <label class="form-label">{% trans "Content" %}</label>
                         {{ form.content }}
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Type</label>
+                        <label class="form-label">{% trans "Type" %}</label>
                         {{ form.question_type }}
                     </div>
                     
                     <div class="form-check my-2">
                         {{ form.locked_problem }}
-                        <label class="form-check-label" for="{{ form.locked_problem.id_for_label }}">Private Question (could not be re-used in other assessments)</label>
+                        <label class="form-check-label" for="{{ form.locked_problem.id_for_label }}">{% trans "Private Question (could not be re-used in other assessments)" %}</label>
                     </div>
 
                     <div class="mt-auto pt-3 text-end">

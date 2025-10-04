@@ -8,21 +8,21 @@
         <div class="d-flex justify-content-between align-items-center mb-5">
             <div>
                 <h2 class="mb-1">{{ evaluation.title }}</h2>
-                <p class="text-muted mb-0">Class: {{ evaluation.online_class.name }}</p>
+                <p class="text-muted mb-0">{% trans "Class" %}: {{ evaluation.online_class.name }}</p>
             </div>
             <div class="btn-group">
-                <a href="{% url 'export_grades_csv' evaluation_id=evaluation.id %}" class="btn btn-info me-2">Export Grades (CSV)</a>
+                <a href="{% url 'export_grades_csv' evaluation_id=evaluation.id %}" class="btn btn-info me-2">{% trans "Export Grades (CSV)" %}</a>
 
-                <form method="post" action="{% url 'run_autograder' evaluation_id=evaluation.id %}" class="me-2" onsubmit="return confirm('Are you sure you want to run the auto-grader? This will calculate initial grades for all coding questions.');">
+                <form method="post" action="{% url 'run_autograder' evaluation_id=evaluation.id %}" class="me-2" onsubmit="return confirm('{% trans "Are you sure you want to run the auto-grader? This will calculate initial grades for all coding questions." %}');">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-dark" {% if evaluation.graded %}disabled{% endif %}>
-                        {% if evaluation.graded %}Auto-Grader Run{% else %}Run Auto-Grader{% endif %}
+                        {% if evaluation.graded %}{% trans "Auto-Grader Run" %}{% else %}{% trans "Run Auto-Grader" %}{% endif %}
                     </button>
                 </form>
-                <form method="post" action="{% url 'release_grades' evaluation_id=evaluation.id %}" onsubmit="return confirm('Are you sure you want to release grades to all students? This action cannot be undone.');">
+                <form method="post" action="{% url 'release_grades' evaluation_id=evaluation.id %}" onsubmit="return confirm('{% trans "Are you sure you want to release grades to all students? This action cannot be undone." %}');">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-success" {% if evaluation.show_grades %}disabled{% endif %}>
-                        {% if evaluation.show_grades %}Grades Released{% else %}Release Grades{% endif %}
+                        {% if evaluation.show_grades %}{% trans "Grades Released" %}{% else %}{% trans "Release Grades" %}{% endif %}
                     </button>
                 </form>
             </div>
@@ -32,11 +32,11 @@
             <table class="table table-hover align-middle">
                 <thead class="table-light sticky-top">
                     <tr>
-                        <th style="width: 25%;">Student</th>
-                        <th style="width: 15%;">Submission Time</th>
-                        <th style="width: 15%;">Progress</th>
-                        <th style="width: 15%;">Submission Type</th>
-                        <th style="width: 10%;">Score</th>
+                        <th style="width: 25%;">{% trans "Student" %}</th>
+                        <th style="width: 15%;">{% trans "Submission Time" %}</th>
+                        <th style="width: 15%;">{% trans "Progress" %}</th>
+                        <th style="width: 15%;">{% trans "Submission Type" %}</th>
+                        <th style="width: 10%;">{% trans "Score" %}</th>
                         <th style="width: 20%;"></th>
                     </tr>
                 </thead>
@@ -47,7 +47,7 @@
                             <div class="d-flex align-items-center">
                                 <h6 class="mb-0 me-2">{{ sub.user.first_name }} {{ sub.user.last_name }}</h6>
                                 {% if sub.needs_manual_grading %}
-                                    <span class="badge bg-warning text-dark">Needs Review</span>
+                                    <span class="badge bg-warning text-dark">{% trans "Needs Review" %}</span>
                                 {% endif %}
                             </div>
                             <small class="text-muted">{{ sub.user.username }}</small>
@@ -56,19 +56,19 @@
                         <td>{{ sub.progress_string }}</td>
                         <td>
                             {% if sub.end_time >= sub.evaluation.end_date %}
-                                <span class="badge bg-danger text-white">Auto-Submitted</span>
+                                <span class="badge bg-danger text-white">{% trans "Auto-Submitted" %}</span>
                             {% else %}
-                                <span class="badge bg-light text-dark">Submitted On Time</span>
+                                <span class="badge bg-light text-dark">{% trans "Submitted On Time" %}</span>
                             {% endif %}
                         </td>
                         <td><strong>{{ sub.score|floatformat:2 }}</strong> / {{ total_weight|floatformat:2 }}</td>
                         <td class="text-end">
-                            <a href="{% url 'grade_student_submission' ue_id=sub.id %}" class="btn btn-outline-primary btn-sm">Grade Submission</a>
+                            <a href="{% url 'grade_student_submission' ue_id=sub.id %}" class="btn btn-outline-primary btn-sm">{% trans "Grade Submission" %}</a>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-5">No submissions yet.</td>
+                        <td colspan="6" class="text-center text-muted py-5">{% trans "No submissions yet." %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

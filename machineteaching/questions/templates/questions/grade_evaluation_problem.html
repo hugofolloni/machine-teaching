@@ -4,7 +4,7 @@
 {% block content %}
 <div class="container-fluid p-4">
     <div class="d-flex justify-content-end mb-4" style="margin-right: 2%">
-        <a href="{% url 'grade_student_submission' ue_id=uep.user_evaluation.id %}" class="btn btn-outline-secondary">&larr; Back to Submission</a>
+        <a href="{% url 'grade_student_submission' ue_id=uep.user_evaluation.id %}" class="btn btn-outline-secondary">&larr; {% trans "Back to Submission" %}</a>
     </div>
     
     <div style="display: flex; flex-direction: row; width: 100%;">
@@ -13,7 +13,7 @@
             <div class="card shadow-sm sticky-top" style="height: 70vh;">
                 <div class="card-body p-4">
                     <h4 class="mb-3">{{ uep.evaluation_problem.problem.title }}</h4>
-                    <p class="text-muted">Description</p>
+                    <p class="text-muted">{% trans "Description" %}</p>
                     <div class="problem-statement mb-4 p-3" style="background-color: #f8f9fa; border-radius: 5px; height: 15vh; overflow-y: auto;">
                         {{ uep.evaluation_problem.problem.content|safe }}
                     </div>
@@ -22,7 +22,7 @@
                         {% csrf_token %}
                         <div class="mb-3">
                             <label for="{{ form.grade.id_for_label }}" class="form-label d-flex justify-content-between">
-                                <span>{{ form.grade.label }} (Weight: {{ uep.evaluation_problem.weight }})</span>
+                                <span>{{ form.grade.label }} ({% blocktrans with weight=uep.evaluation_problem.weight %}Weight: {{ weight }}{% endblocktrans %})</span>
                                 <strong id="grade-display">{{ form.grade.value|default_if_none:uep.grade|default_if_none:"0.0"|floatformat:2 }}</strong>
                             </label>
                             <input 
@@ -48,7 +48,7 @@
                         </div>
                         {% endif %}
                         <div class="d-grid mt-auto">
-                            <button type="submit" class="btn btn-primary">Save</button>
+                            <button type="submit" class="btn btn-primary">{% trans "Save" %}</button>
                         </div>
                     </form>
                 </div>
@@ -58,13 +58,13 @@
         <div class="col-lg-7" style="width: 62%; height: 70vh; display: flex; flex-direction: column; justify-content: space-between;">
             <div class="card shadow-sm" style="{{ style_right_card }}">
                 <div class="card-header">
-                    <h5>Student's Solution</h5>
+                    <h5>{% trans "Student's Solution" %}</h5>
                 </div>
                 <div class="card-body">
                     {% if uep.evaluation_problem.problem.question_type == 'C' %}
                         <textarea id="code-editor">{{ uep.solution|default:"" }}</textarea>
                     {% else %}
-                        <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 5px; height: 90%; white-space: pre-wrap;">{{ uep.solution|default:"No solution submitted." }}</div>
+                        <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 5px; height: 90%; white-space: pre-wrap;">{{ uep.solution|default:_("No solution submitted.") }}</div>
                     {% endif %}
                 </div>
             </div>
@@ -72,11 +72,11 @@
             {% if uep.evaluation_problem.problem.question_type == 'C' %}
             <div class="card shadow-sm" style="height: 25vh; margin: 0;">
                 <div class="card-header">
-                    <h5>Auto-Grader Results</h5>
+                    <h5>{% trans "Auto-Grader Results" %}</h5>
                 </div>
                 <div class="card-body">
-                    <p>Passed <strong>{{ uep.test_case_hits }}</strong> out of <strong>{{ uep.evaluation_problem.evaluationproblemtestcase_set.count }}</strong> test cases.</p>
-                    <p>Calculated Score: <strong>{{ uep.grade|floatformat:2 }} / {{ uep.evaluation_problem.weight|floatformat:2 }}</strong></p>
+                    <p>{% blocktrans count counter=uep.test_case_hits %}Passed <strong>{{ counter }}</strong> out of <strong>{{ uep.evaluation_problem.evaluationproblemtestcase_set.count }}</strong> test cases.{% endblocktrans %}</p>
+                    <p>{% trans "Calculated Score" %}: <strong>{{ uep.grade|floatformat:2 }} / {{ uep.evaluation_problem.weight|floatformat:2 }}</strong></p>
                 </div>
             </div>
             {% endif %}

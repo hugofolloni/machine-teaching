@@ -39,8 +39,8 @@
         <div class="col-lg-7">
             <div class="card shadow-sm mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>{% blocktrans %}Your Solution{% endblocktrans %}</span>
-                    {% if problem.evaluation_problem.problem.question_type == 'C' %}<span class="badge bg-info">Python</span>{% endif %}
+                    <h5>{% trans "Your Solution" %}</h5>
+                    <span class="badge bg-secondary">{{ language_name }}</span>
                 </div>
                 <div class="card-body">
                     {% if problem.evaluation_problem.problem.question_type == 'C' %}
@@ -109,14 +109,29 @@ document.addEventListener('DOMContentLoaded', function() {
     const csrfTokenInput = document.querySelector('[name=csrfmiddlewaretoken]');
     const csrfToken = csrfTokenInput ? csrfTokenInput.value : '';
 
+    const languageName = "{{ language_name }}";
+    const codeMirrorMode = "{{ codemirror_mode }}";
+
     const saveUrl = `{% url 'save_evaluation_progress' uep_id=problem.id %}`;
     let codeEditor = null;
     let plainTextarea = document.querySelector('textarea.form-control');
     const codeTextarea = document.getElementById('code-editor');
     if (codeTextarea) { 
-        codeEditor = CodeMirror.fromTextArea(codeTextarea, { mode: 'python', lineNumbers: true, indentUnit: 4, matchBrackets: true });
+        codeEditor = CodeMirror.fromTextArea(codeTextarea, { mode: codeMirrorMode, lineNumbers: true, indentUnit: 4, matchBrackets: true });
         codeEditor.setSize('100%', '28vh');
     }
+
+    codeEditor.on('change', function() {
+            const solutionText = codeEditor.getValue();
+            fetch("{% url 'save_evaluation_progress' uep_id=problem.id %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ solution: solutionText })
+            });
+        });
 
     const saveProgress = async () => {
         let currentSolution = '';
@@ -171,7 +186,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const zipBlob = await zip.generateAsync({ type: "blob" });
 
                 const formData = new FormData();
-                formData.append('prog_lang', 'Python');
+                formData.append('prog_lang', languageName);
                 formData.append('evaluation_problem_id', {{ problem.evaluation_problem.id }}); 
                 formData.append('file', zipBlob, 'extract-me.zip'); 
 

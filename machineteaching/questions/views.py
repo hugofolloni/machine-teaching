@@ -1172,10 +1172,18 @@ def manage_evaluation(request, evaluation_id):
             problem_id = request.POST.get('problem_id')
             problem = get_object_or_404(Problem, id=problem_id)
             
+            available_solutions = Solution.objects.filter(problem=problem, ignore=False)
+
+            default_language = None
+            if available_solutions.exists():
+                default_language = available_solutions.first().language
+            else:
+                default_language = Language.objects.get(id=1)
+
             with transaction.atomic():
                 eval_problem, created = EvaluationProblem.objects.get_or_create(
                     evaluation=evaluation, problem=problem,
-                    defaults={'weight': 1.0, 'order': evaluation.evaluationproblem_set.count() + 1}
+                    defaults={'weight': 1.0, 'order': evaluation.evaluationproblem_set.count() + 1, 'language': default_language}
                 )
 
                 if created:
@@ -1210,6 +1218,13 @@ def manage_evaluation(request, evaluation_id):
                             weight_value = float(value.replace(',', '.')) 
                             if weight_value >= 0:
                                 EvaluationProblem.objects.filter(id=ep_id, evaluation=evaluation).update(weight=weight_value)
+                        
+                        if key.startswith('language-'):
+                            ep_id = int(key.split('-')[1])
+                            language_id = int(value)
+                            language = Language.objects.get(id=language_id)
+                            EvaluationProblem.objects.filter(id=ep_id, evaluation=evaluation).update(language=language)
+
                 success(request, 'Exam updated successfuly.')
             except (ValueError, TypeError):
                 error(request, 'Error updating exam.')
@@ -1231,10 +1246,18 @@ def manage_evaluation(request, evaluation_id):
     if search_query:
         available_problems = available_problems.filter(title__icontains=search_query, locked_problem=False).order_by('title')
 
+    added_problems = []
+    for ep in evaluation.evaluationproblem_set.order_by('order'):
+        available_languages = Solution.objects.filter(problem=ep.problem, ignore=False).select_related('language').distinct()
+        added_problems.append({
+            'ep': ep,
+            'available_languages': [sol.language for sol in available_languages]
+        })
+
     context = {
         'title': f'Manage exam: {evaluation.title}',
         'evaluation': evaluation,
-        'added_problems': evaluation.evaluationproblem_set.order_by('order'),
+        'added_problems': added_problems, 
         'available_problems': available_problems[:20], 
         'search_query': search_query,
         'problem_form': problem_form, 
@@ -1406,6 +1429,7 @@ def create_evaluation_problem(request, evaluation_id):
             with transaction.atomic():
                 cleaned_data = form.cleaned_data
                 question_type = cleaned_data.get('question_type')
+                language = cleaned_data.get('language')
 
                 problem = Problem.objects.create(
                     title=cleaned_data.get('title'),
@@ -1420,21 +1444,33 @@ def create_evaluation_problem(request, evaluation_id):
                     Solution.objects.create(
                         problem=problem,
                         header=cleaned_data.get('solution_header'),
-                        content=cleaned_data.get('solution_content')
+                        content=cleaned_data.get('solution_content'),
+                        language=language,
+                        return_type = cleaned_data.get('solution_content').split(cleaned_data.get('solution_header') + "(")[0].strip().replace('\n', ' ').split(' ')[-1] if language == 'C' else None,
                     )
                 else:
                     Solution.objects.create(
                         problem=problem,
                         header=f"# Solução para a questão '{problem.title}'",
-                        content="# N/A"
+                        content="# N/A",
+                        language=language
                     )
                 
-                EvaluationProblem.objects.create(
+                eval_problem = EvaluationProblem.objects.create(
                     evaluation=evaluation,
                     problem=problem,
                     weight=1.0, 
-                    order=evaluation.evaluationproblem_set.count() + 1
+                    order=evaluation.evaluationproblem_set.count() + 1,
+                    language=language
                 )
+
+                all_test_cases = problem.testcase_set.all()
+                for tc in all_test_cases:
+                    EvaluationProblemTestCase.objects.create(
+                        evaluation_problem=eval_problem,
+                        test_case=tc,
+                        hidden=False  
+                    )
 
             success(request, f'The questions "{problem.title}" was added successfuly.')
             return redirect('manage_evaluation', evaluation_id=evaluation.id)
@@ -1591,13 +1627,23 @@ def solve_evaluation_problem(request, uep_id):
     prev_uep_id = problem_ids[current_index - 1] if current_index > 0 else None
     next_uep_id = problem_ids[current_index + 1] if current_index < len(problem_ids) - 1 else None
 
+    language_obj = user_eval_problem.evaluation_problem.language
+    if language_obj.name.lower() == 'c':
+        codemirror_mode = 'text/x-csrc'
+    elif language_obj.name.lower() == 'julia':
+        codemirror_mode = 'julia'
+    else:
+        codemirror_mode = 'python'
+
     context = {
         'title': f"Solving: {user_eval_problem.evaluation_problem.problem.title}",
         'problem': user_eval_problem,
         'remaining_seconds': remaining_seconds,
         'user_evaluation_id': user_evaluation.id,
         'prev_uep_id': prev_uep_id,
-        'next_uep_id': next_uep_id
+        'next_uep_id': next_uep_id,
+        'language_name': language_obj.name,
+        'codemirror_mode': codemirror_mode
     }
     return render(request, 'questions/solve_evaluation_problem.html', context)
 
@@ -1718,7 +1764,8 @@ def run_autograder(request, evaluation_id):
         for uep in student_problems:
             problem = uep.evaluation_problem.problem
             if problem.question_type == 'C' and uep.solution:
-                
+                language_obj = uep.evaluation_problem.language
+                language_name = language_obj.name
                 all_exam_test_cases = uep.evaluation_problem.evaluationproblemtestcase_set.all()
                 test_case_weights = {
                     json.dumps(json.loads(eptc.test_case.content)): eptc.weight 
@@ -1726,13 +1773,13 @@ def run_autograder(request, evaluation_id):
                 }
                 test_cases_to_run = [json.loads(eptc.test_case.content) for eptc in all_exam_test_cases]
 
-                solution_obj = Solution.objects.filter(problem=problem, language__name='Python', ignore=False).first()
+                solution_obj = Solution.objects.filter(problem=problem, language=language_obj, ignore=False).first()
                 if not solution_obj:
-                    LOGGER.error(f"No valid solution found for problem {problem.id} to grade UEP {uep.id}")
+                    LOGGER.error(f"No valid solution found for problem {problem.id} / language {language_name} to grade UEP {uep.id}")
                     continue
 
                 form_data = {
-                    'prog_lang': 'Python',
+                    'prog_lang': language_name,
                     'professor_code': solution_obj.content,
                     'func': solution_obj.header,
                     'return_type': solution_obj.return_type,
@@ -1759,7 +1806,7 @@ def run_autograder(request, evaluation_id):
                     for item in results:
                         if item.get('result', {}).get('isCorrect'):
                             passed_count += 1
-                            tc_content_key = json.dumps(item.get('test_case'))
+                            tc_content_key = item['result']['test_case']
                             passed_weight_sum += test_case_weights.get(tc_content_key, 0)
                     
                     uep.test_case_hits = passed_count

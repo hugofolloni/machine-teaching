@@ -51,7 +51,7 @@
 
 </style>
 
-<div class="container-fluid mt-4">
+<div class="container-fluid mt-4" style='margin-bottom: 70px;'>
     <form method="post" novalidate>
         {% csrf_token %}
         <div class="layout-grid">
@@ -94,6 +94,10 @@
                         <div class="mb-3">
                             <label class="form-label solution-header-label">{{ form.solution_header.label }}</label>
                             {{ form.solution_header }}
+                        </div>
+                        <div class="mb-3" id="language-selector-container">
+                            <label class="form-label">{{ form.language.label }}</label>
+                            {{ form.language }}
                         </div>
                         <div class="mb-3 flex-grow-1 d-flex flex-column">
                             <label id='solution-label' class="form-label solution-header-label">{{ form.solution_content.label }}</label>
@@ -153,14 +157,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const testCaseContainer = document.getElementById('test-case-container');
     const solutionContainer = document.getElementById('solution-main-container');
     const solutionHeaderInput = document.getElementById('{{ form.solution_header.id_for_label }}');
-
+    const languageContainer = document.getElementById('language-selector-container');
+    
     function toggleCodeFieldsInteractivity() {
         const isCodeQuestion = questionTypeSelect.value === 'C';
         const wasDisabled = solutionContainer.classList.contains('disabled');
 
         testCaseContainer.classList.toggle('disabled', !isCodeQuestion);
         solutionContainer.classList.toggle('disabled', !isCodeQuestion);
-        
+        languageContainer.style.display = isCodeQuestion ? 'block' : 'none';
         solutionEditor.setOption("readOnly", !isCodeQuestion);
         testCaseEditor.setOption("readOnly", !isCodeQuestion);
         solutionHeaderInput.readOnly = !isCodeQuestion;

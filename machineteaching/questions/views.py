@@ -1869,3 +1869,50 @@ def export_grades_csv(request, evaluation_id):
         ])
 
     return response
+
+@login_required
+@permission_required('questions.change_evaluation', raise_exception=True)
+def grade_evaluation_question_list(request, evaluation_id):
+    evaluation = get_object_or_404(Evaluation, id=evaluation_id)
+    
+    if not Professor.objects.filter(user=request.user, prof_class=evaluation.online_class).exists():
+        raise PermissionDenied("You do not have permission to grade this exam.")
+
+    problems = evaluation.evaluationproblem_set.order_by('order')
+
+    context = {
+        'title': f'Grade by Question: {evaluation.title}',
+        'evaluation': evaluation,
+        'problems': problems,
+    }
+    return render(request, 'questions/grade_evaluation_question_list.html', context)
+
+@login_required
+@permission_required('questions.change_evaluation', raise_exception=True)
+def grade_question_submission(request, ep_id):
+    evaluation_problem = get_object_or_404(EvaluationProblem, id=ep_id)
+    evaluation = evaluation_problem.evaluation
+
+    if not Professor.objects.filter(user=request.user, prof_class=evaluation.online_class).exists():
+        raise PermissionDenied("You do not have permission to grade this exam.")
+
+    student_answers = UserEvaluationProblem.objects.filter(
+        evaluation_problem=evaluation_problem,
+        user_evaluation__submitted=True
+    ).order_by('user_evaluation__user__first_name', 'user_evaluation__user__last_name')
+
+    graded_answers = student_answers.filter(grade__isnull=False)
+    average_score = 0
+    if graded_answers.exists():
+        average_score = graded_answers.aggregate(Avg('grade'))['grade__avg']
+
+    context = {
+        'title': f'Grading: {evaluation_problem.problem.title}',
+        'evaluation': evaluation,
+        'evaluation_problem': evaluation_problem,
+        'student_answers': student_answers,
+        'total_submissions': student_answers.count(),
+        'graded_submissions': graded_answers.count(),
+        'average_score': average_score,
+    }
+    return render(request, 'questions/grade_question_submission.html', context)

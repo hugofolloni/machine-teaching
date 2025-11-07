@@ -4,7 +4,11 @@
 {% block content %}
 <div class="container-fluid p-4">
     <div class="d-flex justify-content-end mb-4" style="margin-right: 2%">
+    {% if request.GET.back == 'question_view' %}
+        <a href="{% url 'grade_question_submission' ep_id=uep.evaluation_problem.id %}" class="btn btn-outline-secondary">&larr; {% trans "Back to Question Submissions" %}</a>
+    {% else %}
         <a href="{% url 'grade_student_submission' ue_id=uep.user_evaluation.id %}" class="btn btn-outline-secondary">&larr; {% trans "Back to Submission" %}</a>
+    {% endif %}   
     </div>
     
     <div style="display: flex; flex-direction: row; width: 100%;">
@@ -75,8 +79,7 @@
                     <h5>{% trans "Auto-Grader Results" %}</h5>
                 </div>
                 <div class="card-body">
-                    <p>{% blocktrans count counter=uep.test_case_hits %}Passed <strong>{{ counter }}</strong> out of <strong>{{ uep.evaluation_problem.evaluationproblemtestcase_set.count }}</strong> test cases.{% endblocktrans %}</p>
-                    <p>{% trans "Calculated Score" %}: <strong>{{ uep.grade|floatformat:2 }} / {{ uep.evaluation_problem.weight|floatformat:2 }}</strong></p>
+                    <p>{% trans "Passed" %} <strong>{{ uep.test_case_hits }}</strong> {% trans "out of" %} <strong>{{ uep.evaluation_problem.evaluationproblemtestcase_set.count }}</strong> {% trans "test cases" %}.</p>                    <p>{% trans "Calculated Score" %}: <strong>{{ uep.grade|floatformat:2 }} / {{ uep.evaluation_problem.weight|floatformat:2 }}</strong></p>
                 </div>
             </div>
             {% endif %}

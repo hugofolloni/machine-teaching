@@ -218,11 +218,22 @@ document.addEventListener('DOMContentLoaded', function() {
         testCaseTabContentContainer.innerHTML = '';
         console.log(resultsList);
 
-        if (!resultsList || !Array.isArray(resultsList) || resultsList.length === 0) {
-            testCaseTabContentContainer.innerHTML = `<div class="alert alert-warning">No results were returned.</div>`;
+        if (resultsList && !Array.isArray(resultsList) && resultsList.pre_process_error) {
+            testCaseTabContentContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    <h5 class="alert-heading">{% trans "Compilation Error" %}</h5>
+                    <p>{% trans "Your code failed to compile. Please fix the syntax errors and try again." %}</p>
+                    <hr>
+                    <pre class="mb-0"><code>${resultsList.message}</code></pre>
+                </div>`;
             return;
         }
-        
+
+        if (!resultsList || !Array.isArray(resultsList) || resultsList.length === 0) {
+            testCaseTabContentContainer.innerHTML = `<div class="alert alert-warning">{% trans "No results were returned." %}</div>`;
+            return;
+        }
+
         resultsList.forEach((item, index) => {
             const result = item.result;
             if (!result) return;

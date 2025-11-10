@@ -1441,12 +1441,28 @@ def create_evaluation_problem(request, evaluation_id):
                 )
 
                 if question_type == 'C':
+                    if language.name.lower() == 'c':
+                        solution_tip = "// Start your C function here"
+
+                        header = cleaned_data.get('solution_header')
+                        content = cleaned_data.get('solution_content')
+                        try:
+                            return_type_str = content.split(f"{header}(")[0]
+                            return_type_str = return_type_str.strip() 
+                        except Exception:
+                            return_type_str = None
+
+                    else:
+                        solution_tip = "# Start your Python function here"
+                        return_type_str = None 
+
                     Solution.objects.create(
                         problem=problem,
                         header=cleaned_data.get('solution_header'),
                         content=cleaned_data.get('solution_content'),
                         language=language,
-                        return_type = cleaned_data.get('solution_content').split(cleaned_data.get('solution_header') + "(")[0].strip().replace('\n', ' ').split(' ')[-1] if language == 'C' else None,
+                        return_type=return_type_str,
+                        tip=solution_tip 
                     )
                 else:
                     Solution.objects.create(

@@ -78,44 +78,61 @@
                 <form method="post">
                     {% csrf_token %}
                     <div class="question-list-container" id="question-list" style="min-height: 60vh;">
-                        {% for ep in added_problems %}
-                            <div class="question-item" data-id="{{ ep.id }}">
+                        {% for item in added_problems %}
+                            <div class="question-item" data-id="{{ item.ep.id }}">
                                 <div class="d-flex justify-content-between align-items-center">
                                     
                                     <div class="d-flex align-items-center flex-grow-1 me-3"> 
                                         <span class="drag-handle me-3">☰</span>
-                                        <h6 class="question-title-clickable preview-btn mb-0" data-url="{% url 'get_problem_details' problem_id=ep.problem.id %}">
-                                            {{ ep.problem.title }}
+                                        <h6 class="question-title-clickable preview-btn mb-0" data-url="{% url 'get_problem_details' problem_id=item.ep.problem.id %}">
+                                            {{ item.ep.problem.title }}
                                         </h6>
                                     </div>
                                     
                                     <div class="btn-group flex-shrink-0">
-                                        {% if ep.problem.question_type == 'C' %}
+                                        {% if item.ep.problem.question_type == 'C' %}
                                         <button type="button" class="btn btn-outline-info btn-sm configure-testcases-btn"
-                                                data-ep-id="{{ ep.id }}"
-                                                data-get-url="{% url 'get_evaluation_problem_testcases_api' ep_id=ep.id %}"
-                                                data-save-url="{% url 'save_testcases_api' ep_id=ep.id %}">
+                                                data-ep-id="{{ item.ep.id }}"
+                                                data-get-url="{% url 'get_evaluation_problem_testcases_api' ep_id=item.ep.id %}"
+                                                data-save-url="{% url 'save_testcases_api' ep_id=item.ep.id %}">
                                             {% trans "Configure Test Cases" %}
                                         </button>
                                         {% endif %}
-                                        <button type="submit" name="remove_question" value="{{ ep.id }}" class="btn btn-outline-danger btn-sm px-3" aria-label="{% trans "Delete" %}"><i class="bi bi-trash"></i></button>
+                                        <button type="submit" name="remove_question" value="{{ item.ep.id }}" class="btn btn-outline-danger btn-sm px-3" aria-label="{% trans "Delete" %}"><i class="bi bi-trash"></i></button>
                                     </div>
 
                                 </div>
 
                                 <div class="mt-2 d-flex align-items-center">
-                                    <label for="weight-{{ep.id}}" class="form-label form-label-sm mb-0">{% trans "Weight" %}:</label>
-                                    <input type="number" name="weight-{{ep.id}}" id="weight-{{ep.id}}" value="{{ ep.weight|stringformat:'s' }}" min="0" step="0.1" class="form-control form-control-sm" style="width: 80px; margin-left: 20px;">
-                                </div>
+                                    <label for="weight-{{item.ep.id}}" class="form-label form-label-sm mb-0">{% trans "Weight" %}:</label>
+                                    <input type="number" name="weight-{{item.ep.id}}" id="weight-{{item.ep.id}}" value="{{ item.ep.weight|stringformat:'s' }}" min="0" step="0.1" class="form-control form-control-sm" style="width: 80px; margin-left: 20px;">
+                                
+                                    {% if item.ep.problem.question_type == 'C' %}
+                                    <label for="language-{{item.ep.id}}" class="form-label form-label-sm mb-0 ms-4">{% trans "Language" %}:</label>
+                                    <select name="language-{{item.ep.id}}" id="language-{{item.ep.id}}" class="form-select form-select-sm" style="width: 120px; margin-left: 20px;">
+                                        
+                                        {% if not item.available_languages %}
+                                            <option value="{{ item.ep.language.id }}" selected>{{ item.ep.language.name }} (No Solution)</option>
+                                        {% endif %}
+                                        
+                                        {% for lang in item.available_languages %}
+                                        <option value="{{ lang.id }}" {% if lang.id == item.ep.language.id %}selected{% endif %}>
+                                            {{ lang.name }}
+                                        </option>
+                                        {% endfor %}
+                                        
+                                    </select>
+                                    {% endif %}
+                                    </div>
                             </div>
                         {% empty %}
                         <p class="text-muted">{% trans "No questions have been added yet." %}</p>
                         {% endfor %}
-                    </div>
+                        </div>
 
                     {% if added_problems %}
                     <div class="text-end mt-4">
-                        <button type="submit" name="update_weights" class="btn btn-primary">{% trans "Confirm" %}</button>
+                        <button type="submit" name="update_exam" class="btn btn-primary">{% trans "Confirm" %}</button>
                     </div>
                     {% endif %}
                 </form>

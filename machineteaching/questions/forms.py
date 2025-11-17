@@ -5,7 +5,8 @@ from django.contrib.auth.models import User
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext as _
 from questions.models import (UserLog, OnlineClass, Chapter, Problem,
-                              Solution, PageAccess, Interactive, Deadline, Comment, Evaluation, UserEvaluationProblem)
+                              Solution, PageAccess, Interactive, Deadline, Comment, 
+                              Evaluation, UserEvaluationProblem, Language)
 import random
 import datetime
 
@@ -230,13 +231,19 @@ class EvaluationProblemForm(forms.ModelForm):
     )
     solution_header = forms.CharField(
         label='Header',
-        required=True,
+        required=False,
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome da Função'})
     )
     solution_content = forms.CharField(
         label='Código da Solução',
-        required=True,
+        required=False,
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 10})
+    )
+    language = forms.ModelChoiceField(
+        queryset=Language.objects.all(),
+        label='Linguagem da Solução',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        required=False 
     )
 
     class Meta:
@@ -254,6 +261,14 @@ class EvaluationProblemForm(forms.ModelForm):
             'content': 'Enunciado',
             'test_case_generator': 'Gerador de Casos de Teste',
             'locked_problem': 'Questão privada (não pode ser usada em outras provas/listas)',
+        }
+        help_texts = {
+            'test_case_generator': mark_safe(
+                """A função deve se chamar <code>generate</code> e retornar uma lista de listas, sendo estas as entradas da função solução.<br>
+                Exemplo: <code>def generate(): <br> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp return [ [x_1, y_1, ...], [x_2, y_2, ...], ...]</code><br>
+                Onde x_i, y_i, z_i... são os valores dos parâmetros de entrada para o caso de teste i.<br>
+                As saídas dos casos de teste são automaticamentes geradas pela verificação dos parâmetros contra a função solução fornecida.<br>"""
+            )
         }
 
     def __init__(self, *args, **kwargs):
@@ -279,13 +294,16 @@ class EvaluationProblemForm(forms.ModelForm):
         question_type = cleaned_data.get('question_type')
         solution_header = cleaned_data.get('solution_header')
         solution_content = cleaned_data.get('solution_content')
+        language = cleaned_data.get('language')
 
         if question_type == 'C':
             if not solution_header:
                 self.add_error('solution_header', 'Este campo é obrigatório para questões de código.')
             if not solution_content:
                 self.add_error('solution_content', 'Este campo é obrigatório para questões de código.')
-        
+            if not language:
+                self.add_error('language', 'Este campo é obrigatório para questões de código.')
+       
         return cleaned_data
 
     

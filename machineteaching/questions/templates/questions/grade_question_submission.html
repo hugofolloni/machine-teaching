@@ -1,0 +1,80 @@
+{% extends "questions/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="container-fluid p-4">
+
+    <div class="d-flex justify-content-end mb-5" style="margin-right: 2%">
+        <a href="{% url 'grade_evaluation_question_list' evaluation_id=evaluation.id %}" class="btn btn-outline-secondary">
+            &larr; {% trans "Back to Question List" %}
+        </a>
+    </div>
+
+    <div style="display: flex; flex-direction: row; width: 100%;">
+        
+        <div class="col-lg-4 mx-3 w-30">
+            <div class="card p-4 shadow-sm sticky-top">
+                <h3 class="mb-3">{{ evaluation_problem.problem.title }}</h3>
+                <div class="problem-statement mb-4 p-3" style="background-color: #f8f9fa; border-radius: 5px; max-height: 20vh; overflow-y: auto;">
+                    {{ evaluation_problem.problem.content|safe }}
+                </div>
+                
+                <ul class="list-unstyled text-muted">
+                    <li class="mb-2"><strong>{% trans "Question Type" %}:</strong><br>{{ evaluation_problem.problem.get_question_type_display }}</li>
+                    <li class="mb-2"><strong>{% trans "Weight" %}:</strong><br>{{ evaluation_problem.weight|floatformat:2 }}</li>
+                </ul>
+                <hr>
+                <div>
+                    <h6 class="text-muted mb-1">{% trans "Average Score" %}</h6>
+                    <h3 class="text-primary mb-0">{{ average_score|floatformat:2 }} / {{ evaluation_problem.weight|floatformat:2 }}</h3>
+                    <small class="text-muted">
+                        {% blocktrans with graded=graded_submissions total=total_submissions %}{{ graded }} of {{ total }} submissions graded{% endblocktrans %}
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 mx-3"  style="width: 62%;">
+            <div class="card p-4 shadow-sm" style='height: 60vh;'>
+                <h4 class="mb-3">{% trans "Student Submissions" %}</h4>
+                <div class="list-group" style='height: 50vh; overflow-y: auto;'>
+                    
+                    {% for answer in student_answers %}
+                        <div class="list-group-item py-3">
+                            <div style="display: flex; flex-direction: row; width: 100%; justify-content: space-between;">
+                                <div class="col-md-8">
+                                    <h6 class="mb-1">{{ answer.user_evaluation.user.get_full_name }}</h6>
+                                    <small class_name="text-muted">
+                                        {% trans "Partial Score" %}: 
+                                        {% if answer.grade is None %}
+                                            <span class="badge bg-warning text-dark">{% trans "Not Graded" %}</span>
+                                        {% else %}
+                                            {{ answer.grade|floatformat:2 }}
+                                        {% endif %}
+                                        / {{ answer.evaluation_problem.weight|floatformat:2 }}
+                                    </small>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <a href="{% url 'grade_evaluation_problem' uep_id=answer.id %}?back=question_view" class="btn btn-primary btn-sm">
+                                        {% trans "Grade Question" %}
+                                    </a>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3 p-2" style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; max-height: 200px; overflow-y: auto;">
+                                {% if answer.evaluation_problem.problem.question_type == 'C' %}
+                                    <pre style="white-space: pre-wrap; margin-bottom: 0;"><code>{{ answer.solution|default:_("No solution submitted.") }}</code></pre>
+                                {% else %}
+                                    <div style="white-space: pre-wrap;">{{ answer.solution|default:_("No solution submitted.") }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% empty %}
+                        <p class="text-center text-muted">{% trans "No submissions for this question yet." %}</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

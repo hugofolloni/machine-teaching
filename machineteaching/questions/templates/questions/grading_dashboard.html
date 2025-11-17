@@ -13,6 +13,8 @@
             <div class="btn-group">
                 <a href="{% url 'export_grades_csv' evaluation_id=evaluation.id %}" class="btn btn-info me-2">{% trans "Export Grades (CSV)" %}</a>
 
+                <a href="{% url 'grade_evaluation_question_list' evaluation_id=evaluation.id %}" class="btn btn-secondary me-2">{% trans "Grade by Question" %}</a>
+
                 <form method="post" action="{% url 'run_autograder' evaluation_id=evaluation.id %}" class="me-2" onsubmit="return confirm('{% trans "Are you sure you want to run the auto-grader? This will calculate initial grades for all coding questions." %}');">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-dark" {% if evaluation.graded %}disabled{% endif %}>

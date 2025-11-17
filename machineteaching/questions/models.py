@@ -430,7 +430,8 @@ class EvaluationProblem(models.Model):
     weight = models.FloatField(default=1.0)
     autocorrection = models.BooleanField(default=True)
     selected_test_cases = models.ManyToManyField( 'TestCase', through='EvaluationProblemTestCase', related_name='evaluation_problems')
-
+    language = models.ForeignKey('Language', on_delete=models.SET_DEFAULT, default=1)
+    
     class Meta:
         verbose_name = _('Evaluation Problem')
         verbose_name_plural = _('Evaluation Problems')

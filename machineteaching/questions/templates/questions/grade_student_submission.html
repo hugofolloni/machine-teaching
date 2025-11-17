@@ -33,28 +33,42 @@
                 <h4 class="mb-3">{% trans "Questions" %}</h4>
                 <div class="list-group" style='height: 50vh; overflow-y: auto;'>
                     {% for problem in problems %}
-                    <div class="list-group-item py-3">
-                        <div style="display: flex; flex-direction: row; width: 100%;">
-                            <div class="col-md-8">
-                                <h6 class="mb-1">
-                                    {% if problem.evaluation_problem.problem.question_type == 'C' %}
-                                        <i class="bi bi-code-slash me-2"></i>
-                                    {% else %}
-                                        <i class="bi bi-file-text me-2"></i>
-                                    {% endif %}
-                                    {{ problem.evaluation_problem.problem.title }}
-                                </h6>
-                                <small class="text-muted">
-                                    {% trans "Partial Score" %}: {{ problem.grade|floatformat:2 }} / {{ problem.evaluation_problem.weight|floatformat:2 }}
-                                </small>
+                        <div class="list-group-item py-3">
+                            <div style="display: flex; flex-direction: row; width: 100%; justify-content: space-between;">
+                                <div class="col-md-8">
+                                    <h6 class="mb-1">
+                                        {% if problem.evaluation_problem.problem.question_type == 'C' %}
+                                            <i class="bi bi-code-slash me-2"></i>
+                                        {% else %}
+                                            <i class="bi bi-file-text me-2"></i>
+                                        {% endif %}
+                                        {{ problem.evaluation_problem.problem.title }}
+                                    </h6>
+                                    <small class="text-muted">
+                                        {% trans "Partial Score" %}: 
+                                        {% if problem.grade is None %}
+                                            <span class="badge bg-warning text-dark">{% trans "Not Graded" %}</span>
+                                        {% else %}
+                                            {{ problem.grade|floatformat:2 }}
+                                        {% endif %}
+                                        / {{ problem.evaluation_problem.weight|floatformat:2 }}
+                                    </small>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <a href="{% url 'grade_evaluation_problem' uep_id=problem.id %}" class="btn btn-primary btn-sm">
+                                        {% trans "Grade Question" %}
+                                    </a>
+                                </div>
                             </div>
-                            <div class="col-md-4 text-end">
-                                <a href="{% url 'grade_evaluation_problem' uep_id=problem.id %}" class="btn btn-primary btn-sm">
-                                    {% trans "Grade Question" %}
-                                </a>
+
+                            <div class="mt-3 p-2" style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; max-height: 200px; overflow-y: auto;">
+                                {% if problem.evaluation_problem.problem.question_type == 'C' %}
+                                    <pre style="white-space: pre-wrap; margin-bottom: 0;"><code>{{ problem.solution|default:_("No solution submitted.") }}</code></pre>
+                                {% else %}
+                                    <div style="white-space: pre-wrap;">{{ problem.solution|default:_("No solution submitted.") }}</div>
+                                {% endif %}
                             </div>
                         </div>
-                    </div>
                     {% endfor %}
                 </div>
             </div>

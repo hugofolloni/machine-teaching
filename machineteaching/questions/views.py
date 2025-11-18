@@ -211,7 +211,13 @@ def submit_code(request):
                 eval_problem = get_object_or_404(EvaluationProblem, id=form_data['evaluation_problem_id'])
                 problem = eval_problem.problem
                 public_test_cases = eval_problem.evaluationproblemtestcase_set.filter(hidden=False)
-                test_cases_to_run = [json.loads(ptc.test_case.content) for ptc in public_test_cases]
+                try:
+                    test_cases_to_run = [json.loads(ptc.test_case.content) for ptc in public_test_cases]
+                    form_data['test_cases'] = json.dumps(test_cases_to_run)
+                except json.decoder.JSONDecodeError:
+                    test_cases_to_run = [ptc.test_case.content for ptc in public_test_cases]
+                    form_data['test_cases'] = test_cases_to_run
+                    form_data['custom_test_cases'] = True
 
             else: 
                 problem_id = form_data['problem_id']
@@ -219,12 +225,14 @@ def submit_code(request):
                 all_test_cases = TestCase.objects.filter(problem=problem)
                 try:
                     test_cases_to_run = [json.loads(tc.content) for tc in all_test_cases]
+                    form_data['test_cases'] = json.dumps(test_cases_to_run)
                 except json.decoder.JSONDecodeError:
                     test_cases_to_run = [tc.content for tc in all_test_cases]
+                    form_data['test_cases'] = test_cases_to_run
                     form_data['custom_test_cases'] = True
 
-            form_data['test_cases'] = json.dumps(test_cases_to_run)
-            form_data['problem_id'] = problem.id 
+            #form_data['test_cases'] = json.dumps(test_cases_to_run)
+            form_data['problem_id'] = problem.id
 
             solution = Solution.objects.filter(problem=problem, language__name=lang, ignore=False).first()
             if not solution:
@@ -1783,11 +1791,12 @@ def run_autograder(request, evaluation_id):
                 language_obj = uep.evaluation_problem.language
                 language_name = language_obj.name
                 all_exam_test_cases = uep.evaluation_problem.evaluationproblemtestcase_set.all()
-                test_case_weights = {
-                    json.dumps(json.loads(eptc.test_case.content)): eptc.weight 
-                    for eptc in all_exam_test_cases
-                }
-                test_cases_to_run = [json.loads(eptc.test_case.content) for eptc in all_exam_test_cases]
+                #test_case_weights = {
+                #    json.dumps(json.loads(eptc.test_case.content)): eptc.weight 
+                #    for eptc in all_exam_test_cases
+                #}
+                #test_cases_to_run = [json.loads(eptc.test_case.content) for eptc in all_exam_test_cases]
+                # Try to treat test cases as JSON objects (like in submit_code). If content isn't valid JSON, fall back to raw content strings.
 
                 solution_obj = Solution.objects.filter(problem=problem, language=language_obj, ignore=False).first()
                 if not solution_obj:
@@ -1799,9 +1808,25 @@ def run_autograder(request, evaluation_id):
                     'professor_code': solution_obj.content,
                     'func': solution_obj.header,
                     'return_type': solution_obj.return_type,
-                    'test_cases': json.dumps(test_cases_to_run),
+                    #'test_cases': json.dumps(test_cases_to_run),
                     'problem_id': problem.id, 
                 }
+                
+                test_case_weights = {}
+                test_cases_to_run = []
+                try:
+                    test_case_weights = {
+                        json.dumps(json.loads(eptc.test_case.content)): eptc.weight
+                        for eptc in all_exam_test_cases
+                    }
+                    test_cases_to_run = [json.loads(eptc.test_case.content) for eptc in all_exam_test_cases]
+                    form_data['test_cases'] = json.dumps(test_cases_to_run)
+                except json.decoder.JSONDecodeError:
+                    test_case_weights = {eptc.test_case.content: eptc.weight for eptc in all_exam_test_cases}
+                    test_cases_to_run = [eptc.test_case.content for eptc in all_exam_test_cases]
+                    form_data['test_cases'] = test_cases_to_run
+                    form_data['custom_test_cases'] = True
+                
                 
                 mem_zip = BytesIO()
                 with zipfile.ZipFile(mem_zip, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -1818,19 +1843,30 @@ def run_autograder(request, evaluation_id):
                     passed_weight_sum = 0
                     total_weight = sum(test_case_weights.values())
                     passed_count = 0
-
-                    for item in results:
-                        if item.get('result', {}).get('isCorrect'):
-                            passed_count += 1
-                            tc_content_key = item['result']['test_case']
-                            passed_weight_sum += test_case_weights.get(tc_content_key, 0)
                     
-                    uep.test_case_hits = passed_count
-                    if total_weight > 0:
-                        question_max_score = uep.evaluation_problem.weight
-                        uep.grade = (passed_weight_sum / total_weight) * question_max_score
+                    if isinstance(results, dict) and results.get('pre_process_error'):   #Se der erro de pré-processamento
+                        #LOGGER.error(f"Pre-processing error for UEP {uep.id}: {results['message']}")
+                        uep.test_case_hits = 0
+                        uep.grade = 0
+                        
+                    elif isinstance(results, list):
+                        for item in results:
+                            if item.get('result', {}).get('isCorrect'):
+                                passed_count += 1
+                                tc_content_key = item['result']['test_case']
+                                passed_weight_sum += test_case_weights.get(tc_content_key, 0)
+                        
+                        uep.test_case_hits = passed_count
+                        if total_weight > 0:
+                            question_max_score = uep.evaluation_problem.weight
+                            uep.grade = (passed_weight_sum / total_weight) * question_max_score
+                        else:
+                            uep.grade = 0 if test_cases_to_run else uep.evaluation_problem.weight
+                    
                     else:
-                        uep.grade = 0 if test_cases_to_run else uep.evaluation_problem.weight 
+                        #LOGGER.error("Unexpected results format from worker: %r", results)
+                        uep.test_case_hits = 0
+                        uep.grade = 0
                     
                     uep.save()
                     

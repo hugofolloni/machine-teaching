@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (Problem, Solution, TestCase, UserLog, Cluster, UserModel,
                      UserProfile, Professor, OnlineClass, Chapter, Deadline,
-                     ExerciseSet, UserLogError, PageAccess, Interactive, Comment, DropOutModel, Collaborator, ChapterLink)
+                     ExerciseSet, UserLogError, PageAccess, Interactive, Comment, DropOutModel, Collaborator, ChapterLink, Evaluation, EvaluationProblem, UserEvaluationProblem, UserEvaluation, EvaluationProblemTestCase)
 from simple_history.admin import SimpleHistoryAdmin
 from import_export.admin import ExportActionMixin
 
@@ -174,3 +174,10 @@ admin.site.register(Cluster)
 admin.site.register(UserModel)
 admin.site.register(UserLogError)
 admin.site.register(ChapterLink)
+
+
+admin.site.register(Evaluation)
+admin.site.register(EvaluationProblem)
+admin.site.register(UserEvaluation)
+admin.site.register(UserEvaluationProblem)
+admin.site.register(EvaluationProblemTestCase)

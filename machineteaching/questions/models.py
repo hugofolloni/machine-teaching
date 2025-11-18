@@ -542,8 +542,8 @@ def delete_professor_group(sender, instance, **kwargs):
 def create_test_cases(sender, instance, created, **kwargs):
     # If generate test case is provided with the Problem, generate and
     # save the test cases
-    if instance.test_case_generator is not None and \
-            instance.test_case_generator != '':
+    if created and instance.test_case_generator is not None and \
+            instance.test_case_generator != '':    #Só cria os casos de teste novamente se for um problema novo
 
         # Transform solution into python function
         function_obj = compile(instance.test_case_generator,

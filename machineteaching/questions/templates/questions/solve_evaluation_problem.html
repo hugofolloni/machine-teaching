@@ -13,8 +13,8 @@
                     <span class="countdown" id="countdown-timer" data-seconds="{{ remaining_seconds }}">--:--:--</span>
                 </div>
                 <hr>
-                <div class="problem-statement mb-3 flex-grow-1" style="overflow-y: auto;">
-                    {{ problem.evaluation_problem.problem.content|safe }}
+                <div id="eval_problem_content" class="problem-statement mb-3 flex-grow-1" style="overflow-y: auto;">
+                    <!-- {{ problem.evaluation_problem.problem.content|safe }} -->
                 </div>
                 <div class="mt-auto pt-3 border-top">
                     <div class="d-flex justify-content-between">
@@ -58,7 +58,7 @@
             </div>
             
             {% if problem.evaluation_problem.problem.question_type == 'C' %}
-            <div class="card shadow-sm" style='height: 31vh'>
+            <div class="card shadow-sm">
                 <div class="card-header">{% blocktrans %}Test Cases{% endblocktrans %}</div>
                 <div class="card-body" id="test-case-results">
                     <div class="overflow-auto" style="white-space: nowrap;">
@@ -79,6 +79,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <script>
+    var converter = new showdown.Converter({'simplifiedAutoLink': true}),
+        text      = `{{ problem.evaluation_problem.problem.content }}`,
+        html      = converter.makeHtml(text);
+    $("#eval_problem_content").html(html);
 document.addEventListener('DOMContentLoaded', function() {
     const timerElement = document.getElementById('countdown-timer');
     if (timerElement) {
@@ -216,13 +220,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderResults(resultsList) {
         testCaseTabsContainer.innerHTML = '';
         testCaseTabContentContainer.innerHTML = '';
-        console.log(resultsList);
+        //console.log(resultsList);
 
         if (resultsList && !Array.isArray(resultsList) && resultsList.pre_process_error) {
             testCaseTabContentContainer.innerHTML = `
                 <div class="alert alert-danger">
-                    <h5 class="alert-heading">{% trans "Compilation Error" %}</h5>
-                    <p>{% trans "Your code failed to compile. Please fix the syntax errors and try again." %}</p>
+                    <h5 class="alert-heading">{% trans "Pre-Processing Error" %}</h5>
+                    <p>{% trans "Your code failed to pass the pre-processing step. Please fix the errors and try again." %}</p>
                     <hr>
                     <pre class="mb-0"><code>${resultsList.message}</code></pre>
                 </div>`;

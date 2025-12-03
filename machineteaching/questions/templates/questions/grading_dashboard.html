@@ -2,6 +2,16 @@
 {% load i18n %}
 
 {% block content %}
+
+<div id="loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; color: white;">
+    <div class="spinner-border text-light" role="status" style="width: 4rem; height: 4rem; margin-bottom: 32px;">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="lead">Rodando o Autograder...</p>
+    <p class="lead">Isso pode levar até 10 minutos.</p>
+    <p class="fw-bold text-warning" style="font-size: 1.2em;">⚠️ POR FAVOR, NÃO FECHE OU ATUALIZE ESTA PÁGINA ATÉ ACABAR! ⚠️</p>
+</div>
+
 <div class="container-fluid mt-4">
     <div class="card p-4 shadow-sm d-flex flex-column" style="height: 75vh;">
         
@@ -15,7 +25,7 @@
 
                 <a href="{% url 'grade_evaluation_question_list' evaluation_id=evaluation.id %}" class="btn btn-secondary me-2">{% trans "Grade by Question" %}</a>
 
-                <form method="post" action="{% url 'run_autograder' evaluation_id=evaluation.id %}" class="me-2" onsubmit="return confirm('{% trans "Are you sure you want to run the auto-grader? This will calculate initial grades for all coding questions." %}');">
+                <form method="post" action="{% url 'run_autograder' evaluation_id=evaluation.id %}" class="me-2" onsubmit="if(confirm('{% trans "Are you sure you want to run the auto-grader? This will calculate initial grades for all coding questions." %}')) { document.getElementById('loading-overlay').style.display = 'flex'; return true; } else { return false; }">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-dark" {% if evaluation.graded %}disabled{% endif %}>
                         {% if evaluation.graded %}{% trans "Auto-Grader Run" %}{% else %}{% trans "Run Auto-Grader" %}{% endif %}

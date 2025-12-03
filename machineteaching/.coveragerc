@@ -1,0 +1,16 @@
+[run]
+source = .
+omit = 
+    */venv/*
+    */migrations/*
+    */tests.py
+    */apps.py
+    */admin.py
+    manage.py
+    */settings.py
+    */urls.py
+    generate      # <-- Adicione esta linha
+    generate.py   # <-- E esta, por segurança
+
+[report]
+show_missing = True
